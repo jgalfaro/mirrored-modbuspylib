@@ -7,9 +7,9 @@ Modbus/TCP Library for Scapy 0.2
 	Tested with Scapy 2.2.0-dev
 
  Authors: - Arthur Gervais (creator)
-          - Ken LE PRADO 
+          - Ken LE PRADO   (new functions)
  
- Licence: Published under the GPL3 (https://www.gnu.org/licenses/gpl.txt)
+ License: Published under the GPL3 (https://www.gnu.org/licenses/gpl.txt)
 
  Supported Function Codes:
  	01 (0x01) Read Coils
@@ -273,13 +273,80 @@ class ModbusPDU11_Report_Slave_Id_Exception(Packet):
 	fields_desc = [ XByteField("funcCode", 0x91),
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
 
-# 0x2B/0x0D - CANopen General Reference Request and Response PDU
-#class ModbusPDU2B_Read Device Identification_Request(Packet):
-#	name = "CANopen General Reference Request and Response PDU"
-#	fields_desc = [ XByteField("funcCode", 0x2B),
-#			XByteField("MEI_Type", 0x0D),       #0x0D (13=CANopen General Reference Request and Response PDU)
-#			
-#					]
+
+#TODO: define FC 0x14 : Read File Record
+class ModbusPDU14_Read_File_Record_Request(Packet):
+	name = "Read File Record"
+	fields_desc = [ XByteField("funcCode", 0x14)]
+
+#TODO: define FC 0x14 : Read File Record Response
+class ModbusPDU14_Read_File_Record_Response(Packet):
+	name = "Read File Record Response"
+	fields_desc = [ XByteField("funcCode", 0x14)]
+class ModbusPDU14_Read_File_Record_Exception(Packet):
+	name = "Read File Record Exception"
+	fields_desc = [ XByteField("funcCode", 0x94),
+			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
+
+#TODO: define FC 0x15 : Write File Record
+class ModbusPDU15_Write_File_Record_Request(Packet):
+	name = "Write File Record"
+	fields_desc = [ XByteField("funcCode", 0x15)]
+
+#TODO: define FC 0x15 : Write File Record Response
+class ModbusPDU15_Write_File_Record_Response(Packet):
+	name = "Write File Record Response"
+	fields_desc = [ XByteField("funcCode", 0x15)]
+class ModbusPDU15_Write_File_Record_Exception(Packet):
+	name = "Write File Record Exception"
+	fields_desc = [ XByteField("funcCode", 0x95),
+			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
+
+
+class ModbusPDU16_Mask_Write_Register_Request(Packet):
+	name = "Mask Write Register"
+	fields_desc = [ XByteField("funcCode", 0x16),
+			XShortField("refAddr", 0x0000),
+			XShortField("andMask", 0x0000),
+			XShortField("orMask", 0x0000)]
+
+class ModbusPDU16_Mask_Write_Register_Response(Packet):
+	name = "Mask Write Register Response"
+	fields_desc = [ XByteField("funcCode", 0x16),
+			XShortField("refAddr", 0x0000),
+			XShortField("andMask", 0x0000),
+			XShortField("orMask", 0x0000)]
+class ModbusPDU16_Mask_Write_Register_Exception(Packet):
+	name = "Mask Write Register Exception"
+	fields_desc = [ XByteField("funcCode", 0x96),
+			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
+
+#TODO: define FC 0x17 : Read/Write Multiple Registers
+class ModbusPDU17_Read_Write_Multiple_Registers_Request(Packet):
+	name = "Read Write Multiple Registers"
+	fields_desc = [ XByteField("funcCode", 0x17)]
+#TODO: define FC 0x17 Response
+class ModbusPDU17_Read_Write_Multiple_Registers_Response(Packet):
+	name = "Read Write Multiple Registers Response"
+	fields_desc = [ XByteField("funcCode", 0x17)]
+
+class ModbusPDU17_Read_Write_Multiple_Registers_Exception(Packet):
+	name = "Read Write Multiple Exception"
+	fields_desc = [ XByteField("funcCode", 0x97),
+			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
+
+class ModbusPDU18_Read_FIFO_Queue_Request(Packet):
+	name = "Read FIFO Queue"
+	fields_desc = [ XByteField("funcCode", 0x18),
+					XShortField("FIFOPointerAddr", 0x0000)]
+#TODO: define FC 0x18 : Read/Write Multiple Registers Response
+class ModbusPDU18_Read_FIFO_Queue_Response(Packet):
+	name = "Read FIFO Queue Response"
+	fields_desc = [ XByteField("funcCode", 0x18)]
+class ModbusPDU18_Read_Write_Multiple_Registers_Exception(Packet):
+	name = "Read FIFO Queue Exception"
+	fields_desc = [ XByteField("funcCode", 0x98),
+			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
 
 # 0x2B/0x0E - Read Device Identification
 class ModbusPDU2B_Read_Device_Identification_Request(Packet):
@@ -320,6 +387,7 @@ class ModbusPDU2B_Read_Device_Identification_Exception(Packet):
 	name = "Read Exception Status Exception"
 	fields_desc = [ XByteField("funcCode", 0xAB),
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
+
 
 
 class ModbusADU_Request(Packet):
@@ -383,6 +451,31 @@ class ModbusADU_Request(Packet):
 			return ModbusPDU11_Report_Slave_Id_Request
 		elif funcCode == 0x91:
 			return ModbusPDU11_Report_Slave_Id_Exception
+
+		elif funcCode == 0x14:
+			return ModbusPDU14_Read_File_Record_Request
+		elif funcCode == 0x94:
+			return ModbusPDU14_Read_File_Record_Exception
+
+		elif funcCode == 0x15:
+			return ModbusPDU15_Write_File_Record_Request
+		elif funcCode == 0x95:
+			return ModbusPDU14_Write_File_Record_Exception
+
+		elif funcCode == 0x16:
+			return ModbusPDU16_Mask_Write_Register_Request
+		elif funcCode == 0x96:
+			return ModbusPDU16_Mask_Write_Register_Exception
+
+		elif funcCode == 0x17:
+			return ModbusPDU17_Read_Write_Multiple_Registers_Request
+		elif funcCode == 0x97:
+			return ModbusPDU17_Read_Write_Multiple_Registers_Exception
+
+		elif funcCode == 0x18:
+			return ModbusPDU18_Read_FIFO_Queue_Request
+		elif funcCode == 0x98:
+			return ModbusPDU18_Read_FIFO_Queue_Exception
 
 		elif funcCode == 0x2B and MEIType == 0x0E:
 			return ModbusPDU2B_Read_Device_Identification_Request
@@ -466,6 +559,31 @@ class ModbusADU_Response(Packet):
 		elif funcCode == 0x91:
 			return ModbusPDU11_Report_Slave_Id_Exception
 
+		elif funcCode == 0x14:
+			return ModbusPDU14_Read_File_Record_Response
+		elif funcCode == 0x94:
+			return ModbusPDU14_Read_File_Record_Exception
+
+		elif funcCode == 0x15:
+			return ModbusPDU15_Write_File_Record_Response
+		elif funcCode == 0x95:
+			return ModbusPDU14_Write_File_Record_Exception
+
+		elif funcCode == 0x16:
+			return ModbusPDU16_Mask_Write_Register_Response
+		elif funcCode == 0x96:
+			return ModbusPDU16_Mask_Write_Register_Exception
+
+		elif funcCode == 0x17:
+			return ModbusPDU17_Read_Write_Multiple_Registers_Response
+		elif funcCode == 0x97:
+			return ModbusPDU17_Read_Write_Multiple_Registers_Exception
+
+		elif funcCode == 0x18:
+			return ModbusPDU18_Read_FIFO_Queue_Response
+		elif funcCode == 0x98:
+			return ModbusPDU18_Read_FIFO_Queue_Exception
+
 		elif funcCode == 0x2B and MEIType == 0x0E:
 			return ModbusPDU2B_Read_Device_Identification_Response
 		elif funcCode == 0xAB:
@@ -483,7 +601,3 @@ class ModbusADU_Response(Packet):
 # Binds TCP port 502 to Modbus/TCP
 bind_layers( TCP, ModbusADU_Request, dport=502 )
 bind_layers( TCP, ModbusADU_Response, sport=502 )
-
-#if __name__ == "__main__":
-#	os.system('clear');
-#	interact(mydict=globals())

