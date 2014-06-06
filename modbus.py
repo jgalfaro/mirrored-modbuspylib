@@ -69,13 +69,17 @@ class ModbusPDU00_Generic_Request(Packet):
 							StrFixedLenField("payload", "", 255)]
 	def extract_padding(self, s):
 		return "", None
-
+	def mysummary(self):
+		return self.sprintf("Modbus Request %funcCode%")
+		
 class ModbusPDU00_Generic_Response(Packet):
 	name = "Generic Request"
 	fields_desc = [ XByteField("funcCode", 0x00),
 							StrFixedLenField("payload", "", 255)]
 	def extract_padding(self, s):
 		return "", None
+	def mysummary(self):
+		return self.sprintf("Modbus Response %funcCode%")
 
 
 # 0x80 - Undefined Generic Exception Function
@@ -85,6 +89,8 @@ class ModbusPDU00_Generic_Exception(Packet):
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
 	def extract_padding(self, s):
 		return "", None
+	def mysummary(self):
+		return self.sprintf("Modbus Exception %funcCode%")
 
 # 0x01 - Read Coils
 class ModbusPDU01_Read_Coils_Request(Packet):
