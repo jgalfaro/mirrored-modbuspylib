@@ -142,7 +142,7 @@ class ModbusPDU03_Read_Holding_Registers_Response(Packet):
 	name = "Read Holding Registers Response"
 	fields_desc = [ XByteField("funcCode", 0x03),
 			BitFieldLenField("byteCount", None, 8, count_of="registerVal"),
-			FieldListField("registerVal", [0x00], ByteField("",0x00), count_from = lambda pkt: pkt.byteCount)]
+			FieldListField("registerVal", [0x00], ShortField("",0x0000), count_from = lambda pkt: pkt.byteCount)]
 class ModbusPDU03_Read_Holding_Registers_Exception(Packet):
 	name = "Read Holding Registers Exception"
 	fields_desc = [ XByteField("funcCode", 0x83),
@@ -160,7 +160,7 @@ class ModbusPDU04_Read_Input_Registers_Response(Packet):
 	name = "Read Input Registers Response"
 	fields_desc = [ XByteField("funcCode", 0x04),
 			BitFieldLenField("byteCount", None, 8, count_of="registerVal"),
-			FieldListField("registerVal", [0x00], ByteField("",0x00), count_from = lambda pkt: pkt.byteCount)]
+			FieldListField("registerVal", [0x00], ShortField("",0x0000), count_from = lambda pkt: pkt.byteCount)]
 class ModbusPDU04_Read_Input_Registers_Exception(Packet):
 	name = "Read Input Registers Exception"
 	fields_desc = [ XByteField("funcCode", 0x84),
@@ -242,7 +242,7 @@ class ModbusPDU10_Write_Multiple_Registers_Request(Packet):
 			XShortField("startingAddr", 0x0000),
 			XShortField("quantityRegisters", 0x0001),
 			BitFieldLenField("byteCount", None, 8, count_of="outputsValue", adjust=lambda pkt,x:x),
-			FieldListField("outputsValue", [0x00], XByteField("", 0x00), count_from = lambda pkt: pkt.byteCount)]
+			FieldListField("outputsValue", [0x0000], XShortField("", 0x0000), count_from = lambda pkt: pkt.byteCount)]
 	def extract_padding(self, s):
 		return "", None
 class ModbusPDU10_Write_Multiple_Registers_Response(Packet):
@@ -274,21 +274,36 @@ class ModbusPDU11_Report_Slave_Id_Exception(Packet):
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
 
 
-#TODO: define FC 0x14 : Read File Record
+#TODO: 0x14 - Read File Record
 class ModbusPDU14_Read_File_Record_Request(Packet):
 	name = "Read File Record"
-	fields_desc = [ XByteField("funcCode", 0x14)]
+	fields_desc = [ XByteField("funcCode", 0x14),
+				ByteField("byteCount", 0x00)]
+#			BitFieldLenField("byteCount", None, 8, count_of="outputsValue", adjust=lambda pkt,x:x),
+#			FieldListField("outputsValue", [0x0000], XShortField("", 0x0000), count_from = lambda pkt: pkt.byteCount)]
+	def guess_payload_class(self, payload):
+		if self.byteCount >0:		
+			return ModBusPDU_Read_Sub_Request
+		else:
+			return Packet.guess_payload_class(self, payload)
 
 #TODO: define FC 0x14 : Read File Record Response
 class ModbusPDU14_Read_File_Record_Response(Packet):
 	name = "Read File Record Response"
-	fields_desc = [ XByteField("funcCode", 0x14)]
+	fields_desc = [ XByteField("funcCode", 0x14),
+				ByteField("dataLength", 0x00)]
+	def guess_payload_class(self, payload):
+		if self.objCount >0:		
+			return ModBusPDU_Read_Sub_Response
+		else:
+			return Packet.guess_payload_class(self, payload)
+
 class ModbusPDU14_Read_File_Record_Exception(Packet):
 	name = "Read File Record Exception"
 	fields_desc = [ XByteField("funcCode", 0x94),
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
 
-#TODO: define FC 0x15 : Write File Record
+#0x15 : Write File Record
 class ModbusPDU15_Write_File_Record_Request(Packet):
 	name = "Write File Record"
 	fields_desc = [ XByteField("funcCode", 0x15)]
@@ -297,6 +312,7 @@ class ModbusPDU15_Write_File_Record_Request(Packet):
 class ModbusPDU15_Write_File_Record_Response(Packet):
 	name = "Write File Record Response"
 	fields_desc = [ XByteField("funcCode", 0x15)]
+
 class ModbusPDU15_Write_File_Record_Exception(Packet):
 	name = "Write File Record Exception"
 	fields_desc = [ XByteField("funcCode", 0x95),
@@ -321,14 +337,24 @@ class ModbusPDU16_Mask_Write_Register_Exception(Packet):
 	fields_desc = [ XByteField("funcCode", 0x96),
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
 
-#TODO: define FC 0x17 : Read/Write Multiple Registers
+
+#0x17 : Read/Write Multiple Registers
 class ModbusPDU17_Read_Write_Multiple_Registers_Request(Packet):
 	name = "Read Write Multiple Registers"
-	fields_desc = [ XByteField("funcCode", 0x17)]
-#TODO: define FC 0x17 Response
+	fields_desc = [ XByteField("funcCode", 0x17),
+			XShortField("readStartingAddr", 0x0000),
+			XShortField("readQuantityRegisters", 0x0001),
+			XShortField("writeStartingAddr", 0x0000),
+			XShortField("writeQuantityRegisters", 0x0001),
+			BitFieldLenField("byteCount", None, 8, count_of="outputsValue", adjust=lambda pkt,x:x),
+			FieldListField("outputsValue", [0x0000], XShortField("", 0x0000), count_from = lambda pkt: pkt.byteCount)]
+
+#0x17 Response
 class ModbusPDU17_Read_Write_Multiple_Registers_Response(Packet):
 	name = "Read Write Multiple Registers Response"
-	fields_desc = [ XByteField("funcCode", 0x17)]
+	fields_desc = [ XByteField("funcCode", 0x17),
+				BitFieldLenField("byteCount", None, 8, count_of="registerVal"),
+				FieldListField("registerVal", [0x0000], ShortField("",0x0000), count_from = lambda pkt: pkt.byteCount)]
 
 class ModbusPDU17_Read_Write_Multiple_Registers_Exception(Packet):
 	name = "Read Write Multiple Exception"
@@ -339,11 +365,17 @@ class ModbusPDU18_Read_FIFO_Queue_Request(Packet):
 	name = "Read FIFO Queue"
 	fields_desc = [ XByteField("funcCode", 0x18),
 					XShortField("FIFOPointerAddr", 0x0000)]
+
 #TODO: define FC 0x18 : Read/Write Multiple Registers Response
 class ModbusPDU18_Read_FIFO_Queue_Response(Packet):
 	name = "Read FIFO Queue Response"
-	fields_desc = [ XByteField("funcCode", 0x18)]
-class ModbusPDU18_Read_Write_Multiple_Registers_Exception(Packet):
+	fields_desc = [ XByteField("funcCode", 0x18),
+#TODO: ByteCount must includes size of FIFOCount
+				BitFieldLenField("byteCount", None, 8, count_of="FIFOVal"),
+				ByteField("FIFOCount", 0x00),
+				FieldListField("FIFOVal", [0x0000], ShortField("",0x0000), count_from = lambda pkt: pkt.byteCount)]
+
+class ModbusPDU18_Read_FIFO_Queue_Exception(Packet):
 	name = "Read FIFO Queue Exception"
 	fields_desc = [ XByteField("funcCode", 0x98),
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
@@ -364,7 +396,8 @@ class ModbusPDU2B_Read_Device_Identification_Response(Packet):
 			ByteEnumField("readCode", 4 , _read_device_id_codes),
 			XByteField("conformityLevel", 0x00),   #0x01, 0x02, 0x03, 0x04, 0x81, 0x82, 0x83, 0x84
 			XByteField("more", 0x00),              #0x00 (no more)   0xFF (more objects)
-			XByteField("nextObjId", 0x00),              
+			XByteField("nextObjId", 0x00),
+##TODO: Define automatically the objCount              
 			ByteField("objCount", 0x00)
 			]
 	def guess_payload_class(self, payload):
@@ -377,11 +410,29 @@ class ModBusPDU_ObjectId(Packet):
 	name = "Object"
 	fields_desc = [ByteField("id", 0x00),            
 			ByteField("length", 0x00),
-	#TODO Bad thing here...		FieldLenField("length", None, length_of="value"),
-			StrLenField("value", "", length_from = lambda pkt: pkt.length) #TODO : define my type because char are on 2 bytes
+#TODO Bad thing here...		FieldLenField("length", None, length_of="value"),
+#TODO : define my type because char are on 2 bytes (to be displayed well)
+			StrLenField("value", "", length_from = lambda pkt: pkt.length) 
 			]
 	def guess_payload_class(self, payload):
 		return ModBusPDU_ObjectId
+
+class ModBusPDU_Read_Sub_Request(Packet):
+	name = "Sub-request"
+	fields_desc = [ByteField("refType", 0x06),            
+			ShortField("fileNumber", 0x0001),
+			ShortField("startAddr", 0x0000),
+			ShortField("length", 0x0001)]
+	def guess_payload_class(self, payload):
+		return ModBusPDU_Read_Sub_Request
+
+class ModBusPDU_Read_Sub_Response(Packet):
+	name = "Sub-response"
+	fields_desc = [BitFieldLenField("respLength", None, 8, count_of="recData", adjust=lambda pkt,x:x),
+			ByteField("refType", 0x06),
+			FieldListField("recData", [0x0000], XShortField("", 0x0000), count_from = lambda pkt: pkt.respLength)]
+	def guess_payload_class(self, payload):
+		return ModBusPDU_Read_Sub_Response
 
 class ModbusPDU2B_Read_Device_Identification_Exception(Packet):
 	name = "Read Exception Status Exception"
@@ -460,7 +511,7 @@ class ModbusADU_Request(Packet):
 		elif funcCode == 0x15:
 			return ModbusPDU15_Write_File_Record_Request
 		elif funcCode == 0x95:
-			return ModbusPDU14_Write_File_Record_Exception
+			return ModbusPDU15_Write_File_Record_Exception
 
 		elif funcCode == 0x16:
 			return ModbusPDU16_Mask_Write_Register_Request
@@ -567,7 +618,7 @@ class ModbusADU_Response(Packet):
 		elif funcCode == 0x15:
 			return ModbusPDU15_Write_File_Record_Response
 		elif funcCode == 0x95:
-			return ModbusPDU14_Write_File_Record_Exception
+			return ModbusPDU15_Write_File_Record_Exception
 
 		elif funcCode == 0x16:
 			return ModbusPDU16_Mask_Write_Register_Response
@@ -601,3 +652,4 @@ class ModbusADU_Response(Packet):
 # Binds TCP port 502 to Modbus/TCP
 bind_layers( TCP, ModbusADU_Request, dport=502 )
 bind_layers( TCP, ModbusADU_Response, sport=502 )
+#TODO#TODO#TODO#TODO
