@@ -1,0 +1,226 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[francais]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\author{Ken LE PRADO}
+\title{Etude de sécurité du protocole Modbus}
+\begin{document}
+
+\section{Contexte}
+	
+	\subsection{Présentation des SCADA}
+		Un SCADA est un système de télé-administration et de contrôle de mesures.
+		Utilisé dans des domaines industriels critiques tels que production d'énergie (centrale nucléaire, barrage hydraulique, etc.), chaînes de production, transport d'hydrocarbure, etc.
+		
+		Un SCADA est un ensemble regroupant trois types d'éléments :
+		\begin{itemize}
+		\item Remote Terminal Unit (RTU) : élément interconnecté avec les capteurs et moteurs
+		\item Master Terminal Unit (MTU) couplé avec une interface Homme-Machine (HMI) permettant l'administration du système
+		\item Une infrastructure réseau permettant aux éléments d'interagir.
+		\end{itemize}
+		
+		Les SCADA ont été développés dans un soucis de sûreté de fonctionnement à un moment où la cyber-sécurité n'était pas d'actualité. Les problématiques étaient donc d'avoir en particulier des protocoles réseau devant faire passer l'information et de lutter notamment contre des erreurs de transmission mais pas de bénéficier de protocoles fort contre des attaques volontaires.
+		
+		Il existe de très nombreux protocoles réseau SCADA dont les principaux sont Modbus, Profinet, DNP3, ICCP. La majorité des protocoles sont fermés. L'objectif de ces protocoles écrits entre les années 1970 et 1990 est de lire les valeurs des capteurs ou d'actionner des moteurs par le biais des RTU.
+		
+		L'étude portera sur Modbus qui est un protocole ouvert, majoritairement déployé.
+	
+	\subsection{Le protocole Modbus}
+		Modbus est le plus ancien ancien protocole et probablement le plus répandu dans l'industrie. Il a été défini par Modicon en 1979 lors de la création du premier Programmable Logic Controller (PLC), une version basique d'un RTU. Il s'est alors largement répandu et est devenu un standard de fait grâce à sa simplicité et à sa licence libre.
+
+		Modbus a d'abord été définit pour être véhiculé sur une interface série. Il a par la suite été adapté pour fonctionner également sur une pile TCP/IP. Les composant peuvent communiquer dans un environnement hétérogène qui converrrtissent les messages entre Modbus/TCP et Modbus/ASCII dont la structure est très similaire. Par ailleurs, il est intéressant de noter que de nombreuses restrictions sur le protocole découlent de l'héritage série du protocole (longueur des messages, présence d'un Unit ID, taille des champs).
+		
+		
+		Modbus définit un échange de données entre un Master (le MTU) et un Slave (le RTU). Ainsi un Master va effectuer une requête vers un Slave qui y répondra. Ce couple question/réponse est la base du protocole.
+		Toute requête est dotée d'un entête (Application Data Unit, ADU) et d'un payload (Protocol Data Unit , PDU). L'entête comporte les éléments :
+		\begin{itemize}
+		\item Transaction ID : permet de faire le lien entre la requête et la réponse
+		\item Identifiant de protocole : valeur unique à 0
+		\item La longueur du payload
+		\item Unit Id : Slave devant traiter la requête
+		\end{itemize}
+		
+		Le PDU comporte le type de requête (ou \textit{function code}) qu'exécute le master. Les éléments suivants dépendent du type de la requête.
+		Toutes les réponses contiennent le même entête et un code associé au type de requête (identique ou correspondant dans le cas d'une exception).
+		
+		L'interface présentée par un RTU défini un ensemble de registre de quatre types :
+		\begin{itemize}
+		\item Discrete Inputs / Input Registers : Données de type booléen ou entier (16 bits) accessibles uniquement en lecture par un MTU,
+		\item Coils / Holding Registers : Données de type booléen ou entier (16 bits) accessibles en lecture/écriture seulement par un MTU. Le RTU ne devrait pas en modifier la valeur.
+		\end{itemize}
+		Ces quatre type de registres permettent à un MTU de lire l'état d'un capteur (lecture seule) ou de transmettre un ordre en modifiant une valeur.
+		
+		Les codes de fonction correspondent à des fonctions élémentaires émises sur initiative du Master vers le slave. Un certain nombre de fonctions sont définies par le protocole (Read Coils, Write Register, etc.) et d'autres peuvent être définies par une implémentation particulière.
+	
+	\subsection{Réalisation d'un banc de test}
+		Afin de réaliser une étude de sécurité sur le protocole Modbus, un banc de test physique a été construit.
+	
+		Le banc de test est construit avec des Lego Mindstorms EV3. Une brique EV3 interagit avec des capteurs (de pression, de couleur, gyroscopique, etc.) et des moteurs. Une brique EV3 est un ordinateur dont plusieurs API ont été développées. Le banc de test a été réalisé grâce à l'API Java Lejos et à la bibliothèque Modbus Jamod.
+		
+		Il a été choisi de maquetter un système de pont levant et de péages pour la mise en oeuvre du banc de test.
+		La conception du banc de test a suivi les étapes suivantes :
+		\begin{enumerate}
+		\item définition des fonctions essentielles,
+		\item définition du modèle de données des interfaces des RTU,
+		\item construction de la maquette,
+		\item installation du framework de la maquette (EV3, infrastructure réseau),
+		\item développement des fonctions Modbus absentes,
+		\item développement des RTU et MTU.
+		\end{enumerate}
+		
+		Le pont levant et les péages assurent le rôle de RTU qui agissent transmettent les valeurs des capteurs et agissent sur les moteurs.
+		Le péage accepte 3 modes : fermé, ouvert (gratuit), ouvert sur paiement. Les valeurs présentées par le RTU sont notamment le nombre de pièces avalées, le nombre de voitures ayant transitées, les valeurs des capteurs de passage et de couleur de pièce.
+		Le pont levant met en oeuvre un système de levage d'un tablier, et d'une barrière de sécurité précédant le pont. Plusieurs capteurs permettent de connaître l'état du pont : capteur gyroscopique, capteur de présence de bateau, capteur de passage de véhicules.
+		
+		Le banc de test physique maquetté grâce à des Lego permet une représentation visuelle simple d'accès (bon marché et modulaire). Il s'agit d'une possibilité complémentaire à une simulation de type Scadasim (module Omnet++).
+
+\section{Étude de sécurité}
+
+	L'étude de la sécurité du protocole réseau Modbus se porte à trois niveaux : les couches réseaux sur lesquelles reposent Modbus, l'implémentation spécifique de Modbus et le protocole en lui-m\^eme.
+	
+	L'étude a été réalisée gr\^ace à l'outil Scapy, un module en python permettant de créer des paquets et de d'analyser les réponses. La définition existante de modbus pour Scapy\footnote{Scadafore} a été très largement complétée pour implémenter la quasi totalité (xx/14) des fonctions publiques de Modbus.
+	
+	\subsection{Sécurité des couches inférieures}
+		
+		Modbus/TCP repose sur la pile TCP/IP. Il est intéressant de s'attacher aux problématiques liées à cette pile et face aux attaques connues qui peuvent participer comme brique élémentaire à un scénario d'attaque.
+		
+		Exemples : 
+		\begin{itemize}
+		\item \textit{ARP Spoofing} la fonction d'ARP spoofing permet à un attaquant d'usurper les adresses MAC et IP sur un lien afin d'attirer le trafic et de se mettre en position de Man in the Middle,
+		\item \textit{SYN Flood} la génération de nombreux paquets de demandes de connexions vers un RTU peut créer un déni de service, le RTU n'étant plus apte à répondre aux connexions légitimes,
+		\item \textit{Vol de session TCP} TCP sécurise au niveau transport la communication des couches supérieures contrairement au protocole UDP, notamment par l'établissement d'une session, suivie par les pairs grâce à des numéros de séquence. Si un attaquant parvient à émettre un paquet TCP illégitime avec un numéro de séquence correct (par exemple en capturant le trafic), celui-ci sera apte à transmettre une requête vers le RTU qui sera acceptée et traitée.
+		\end{itemize}
+	
+	\subsection{Implémentation de Modbus}
+	
+		Tout équipement implémentant Modbus est potentiellement sujet à des erreurs d'implémentation qui peuvent un vecteur d'attaque.
+		
+		Modbus est un protocole peu complexe. Aussi, il est simple d'écrire des règles de conformité\footnote{Référence pour les IDS} pour un système de détection d'intrusions (IDS).
+		
+		Cependant, dans un cadre industriel, il n'est pas possible de rejeter les paquets incorrects, dans la crainte de créer un dysfonctionnement par la détection d'un faux-négatif.
+		
+		Les attaques sur l'implémentation ont été effectuées sur le banc de test réalisé \footnote{test sur banc réel possible à l'ANSSI}.
+		
+		L'implémentation des attaques a consisté en :
+		\begin{itemize}
+		\item \textit{Fuzzing cohérent} développer un outil testant des valeurs aléatoires possible pour tous les champs des messages Modbus. Les messages sont cohérents, mais les données soumises peuvent ne pas avoir de sens,
+		\item \textit{Fuzzing incohérent} développer un outil de génération de paquets incohérents (Exemple : longueur de champs incorrecte, etc.),
+		\item \textit{Test de vulnérabilité} déployer un outil d'exploitation de vulnérabilité (Métasploit).
+		\end{itemize}
+		
+		
+		Autres tests possibles :
+		\begin{itemize}
+		\item Réponse non sollicitée
+	    \end{itemize}
+		
+	\subsection{Sécurité du protocole Modbus}
+
+        Modbus, ainsi que la majorité des protocoles réseau des SCADA n'intègre pas de fonction de sécurité telles que l'authentification ou le chiffrement.
+
+        \subsubsection{Intégrité}
+	        L'intégrité du message est validée grâce à la couche TCP pour modbus/TCP ou par l'ajout d'un champ de contrôle (CRC) pour Modbus/Serial. Cependant, sans authentification du message, un attaquant peut modifier le message et recalculer un CRC valide. Il s'agit uniquement d'une protection contre les erreurs de transmissions.
+	        Un attaquant ayant accès au réseau (et en l'absence de filtrage) peut simplement émettre une requ\^ete vers un RTU qui sera traitée.
+	        
+	        Dès lors, des attaques de type rejeu, modification de paquets sont possibles simplement.
+        
+        \subsubsection{Confidentialité}
+	        Les données n'étant pas chiffrées, il est possible pour attaquant d'effectuer de manière active (par requête sur un RTU) ou de manière passive (écoute du trafic) la cartographie des RTU (énumération des RTU, de leur type, du dictionnaire des registres et de leurs valeurs).
+	        Il est à noter que la présence d'un chiffrement peut complexifier et ralentir les échanges entre MTU et RTU qui sont soumis à des contraintes de délais très importantes.
+
+
+
+Elements supplémentaires :
+    \begin{itemize}
+    \item pas de CRC au niveau applicatif
+    \item programmable : Modbus peut être utilisé pour injecter du code dans un PLC, ce qui peut se révéler très dangereux.
+    \item fonction Modbus/ASCCI dangereuses, mais non reportées en TCP
+    \end{itemize}
+
+
+    \subsection{De la sécurité des protocoles entre RTU et capteurs ou actionneurs}
+%TODO: http://www.generationrobots.com/en/content/50-analysing-i2c-communication-with-saleae-logic-analyser
+
+    Sur les Lego : I2C pour capteurs, PWM pour moteurs
+
+
+\section{Amélioration de la sécurité}
+
+	Malgré l'éventail important de protocole réseau pour SCADA, peu intègre nativement des fonctionnalités de sécurité.
+
+	\subsection{ProfiSafe}
+    Profisafe est une surcouche du protocole Profinet, intégrant les fonctions de sécurité suivantes :
+    \begin{itemize}
+    \item timestamp
+    \
+    \end{itemize}
+	
+	\subsection{Modbus : opensafety}
+    À détailler.
+
+	\subsection{Secure DNP3}
+    DNP3 est utilisé principalement dans les centrales électriques américaines. DNP3 redéfinit les couches protocolaires (réseau, transport, applicatif).
+    
+    Une extension de sécurité, \textit{Secure DNP3}, a été développée afin d'ajouter des fonctions
+
+    Système de Challenge/Réponse pour une authentification\footnote{Industrial Network Security - Securing critical infrastructure networks, p88}
+    Puis hash du message et de la clé échangée pour créer un CRC.
+    Edit : semble vulnérable au rejeu.
+    
+    Surface d'attaque plus importante sur les implémentations (vulnérabilités connues nombreuses)
+    
+	http://www.digitalbond.com/scadapedia/protocols/secure-dnp3/
+	
+	\subsection{Vers un Modbus safety}
+
+    Objectifs de sécurité :
+    \begin{itemize}
+    \item tous les messages doivent être authentifiés (requête et réponse)
+    \item lutte contre les rejeux : un même message ne doit pas pouvoir être réémis par une entité illégitime
+    \item compatibilité avec les versions précédentes
+    \end{itemize}
+
+    L'objectif principal de sécurité étant l'authentification des messages, la confidentialité des données par le chiffrement est délégué aux couches basses par l'utilisation de tunnels de chiffrement de type IPSEC ou par l'implémentation de TLS.
+
+    \subsubsection{Définition du protocole}
+	    
+	    Une pleine compatibilité avec la version actuelle du protocole Modbus annihilerait toute tentative de sécurisation. Il suffirait pour un attaquant de spécifier la version précédente pour shunter les évolutions.
+        Il serait également possible de réécrire les fonctions en utilisant un code de fonction différent en implémentant les fonctions de sécurité. L'entête serait alors identique, mais les messages manqueraient de cohérence.	        
+        Il est à noter que Modbus ayant un héritage ancien, toutes les données sont définies sur 1, 8 ou 16 bits. Afin de connaître l'état d'un Slave en pseudo temps-réel, le Master peut être amené à effectuer de très nombreuses requêtes. Ainsi, afin d'éviter des valeurs identiques (paradoxe des anniversaires), les champs utilisés pour assurer l'authentification seront dimensionnés à 128 bits (8 x 16 bits).
+        
+        Modbus permet l'émission de messages en broadcast (Unit Id à 0). L'utilisation d'un transaction Id par hôte ne permet plus d'utiliser cette fonctionnalité, qui n'est utilisée qu'en série et qui est un manque de confidentialité.
+        
+	    Lutte contre les rejeux : 
+            \begin{itemize}
+            \item utilisation d'un champ horodaté (d'où la nécessité de synchroniser la date/heure)
+    	     \item affinement de l'utilisation de l'identifiant de transaction. Cet identifiant est utilisé par Modbus uniquement pour mettre en relation la requête et la réponse. Pour approfondir la sécurité, le Slave doit vérifier que ce numéro est séquentiel ou renvoyer une exception vers le Master.
+    	     \end{itemize}            	        
+	    
+	    Authentification :
+            \begin{itemize}
+	        \item par clé asymétrique => IGC compliquée
+	        \item \textbf{par MAC }=> plus simple
+    	     \end{itemize}            	        
+            
+        Prise en compte au sein du protocole Modbus
+        
+            Modification de l'ADU :
+            \begin{itemize}
+            \item numéro de version de protocole à 1 au lieu de 0            
+            \item ajout d'un timestamp sur 4 octets
+            \item agrandissement du champ transaction Id pour ajouter de l'entropie pour le calcul de MAC
+            \item adaptation du champ de longueur de message
+    	     \end{itemize}            	        
+       
+            Ajout de codes de fonctions :
+            \begin{itemize}
+            \item FC65 : Synchronisation de l'heure
+    	     \end{itemize}            	        
+
+            Ajout d'une queue de message :
+            \begin{itemize}
+            \item MAC du message            
+    	     \end{itemize}            	        
+            
+\end{document}
