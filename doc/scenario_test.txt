@@ -1,0 +1,40 @@
+SCENARIO DE PRESENTATION
+------------------------
+
+
+
+A) Démarrage banc de test :
+1. Routeur
+2. Bridge puis Toll
+3. VM Test
+   3.1 sudo ./loadconfig
+   3.2 sudo /home/user/projects/tollbridge/simtoll.sh
+   3.3 /home/user/projects/tollbridge/cc.sh
+   3.4 sudo wireshark
+
+B) Démo Toll/bridge
+1. Démonstrateur
+   1.1 Connexion pont et péages
+   1.2 Montrer modes des péages
+   1.3 Montrer modes du pont
+2. Capture réseau
+   2.1 Montrer capture Wireshark
+
+C) Analyse de vulnérabilités
+1. TCP/IP
+   sudo ./attack.py -m SYN_flood -t 10.0.1.1
+2. Confidentialité / Découverte
+   2.1 Découverte du réseau :
+      sudo ./attack.py -m scanNetwork -t 10.0.1.1
+   2.2 Découverte des codes de fonction
+      ./attack.py -m scanDeviceCode -t 10.0.1.1
+      Intrusif : ./attack.py -m scanDeviceCode -t 10.0.1.1 -c
+   2.3 Découverte des registres et Identification
+      ./attack.py -m scanDevice -t 10.0.1.1
+   2.4 Monitoring des valeurs
+      Actif : ./attack.py -m activeMonitor -t 10.0.1.1
+      Passif : sudo ./attack.py -m passiveMonitor -t 10.0.1.1
+
+
+
+
