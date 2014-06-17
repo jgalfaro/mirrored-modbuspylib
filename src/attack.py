@@ -64,13 +64,13 @@ class MBregisters():
 	Read Device diagnostic
 	"""
 	def scanDeviceIdent(self):
-		global MINOBJECTID, MAXOBJECTID, iface
+		global MINOBJECTID, MAXOBJECTID
 		# Open connection
 		c = connectMb(self.ip)
 		
 		for objId in range(MINOBJECTID, MAXOBJECTID):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=4, objectId=objId)
-			ans = c.sr1(pkt, verbose=verbose, iface=iface)
+			ans = c.sr1(pkt, verbose=verbose)
 			ans = ModbusADU_Response(str(ans))
 	
 			if ans.funcCode == 0x2B:
@@ -84,7 +84,7 @@ class MBregisters():
 	Test the device function codes defined
 	"""			
 	def checkCodeDefined(self, code):
-		global verbose, iface
+		global verbose
 ##		knownFunctions = [1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 20, 21, 22, 23, 24, 43]	
 		
 		#Check if code has been already set
@@ -134,7 +134,7 @@ class MBregisters():
 		try:			
 			if verbose:
 				print pkt.summary()
-			ans = c.sr1(pkt, timeout=1000, verbose=False, iface=iface)
+			ans = c.sr1(pkt, timeout=1000, verbose=False)
 			ansADU = ModbusADU_Response(str(ans))
 			if verbose:
 				print ansADU.summary()
@@ -165,7 +165,7 @@ class MBregisters():
 
 
 	def checkCoilsDefined(self):
-		global verbose, MINADDR, MAXADDR, iface
+		global verbose, MINADDR, MAXADDR
 		self.checkCodeDefined(1)
 		if 1 not in self.code:
 			if verbose:
@@ -176,7 +176,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose, iface=iface)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -192,7 +192,7 @@ class MBregisters():
 
 
 	def checkInDiscreteDefined(self):
-		global verbose, MINADDR, MAXADDR, iface
+		global verbose, MINADDR, MAXADDR
 		self.checkCodeDefined(2)
 		if 2 not in self.code:
 			if verbose:
@@ -203,7 +203,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose, iface=iface)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -217,7 +217,7 @@ class MBregisters():
 		c.close()
 
 	def checkHoldRegDefined(self):
-		global verbose, MINADDR, MAXADDR, iface
+		global verbose, MINADDR, MAXADDR
 		self.checkCodeDefined(3)
 		if 3 not in self.code:
 			if verbose:
@@ -228,7 +228,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose, iface=iface)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -242,7 +242,7 @@ class MBregisters():
 		c.close()
 
 	def checkRegInDefined(self):
-		global verbose, MINADDR, MAXADDR, iface
+		global verbose, MINADDR, MAXADDR
 		self.checkCodeDefined(4)
 		if 4 not in self.code:
 			if verbose:
@@ -253,7 +253,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose, iface=iface)
+			ans = c.sr1(pkt, verbose=verbose)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -297,12 +297,12 @@ class SniffMB(threading.Thread):
 		"""
 		Sniffing traffic
 		"""
-		global verbose, iface
+		global verbose
 
 		if verbose:
 			print("Sniffing...")
 #		try:
-		sniff(prn=self.__reply, iface=iface, filter="port " + str(modport), timeout = 20)
+		sniff(prn=self.__reply, filter="port " + str(modport), timeout = 20)
 #		except KeyboardInterrupt:
 #			sys.exit(0)
 #		except:
@@ -413,19 +413,18 @@ Example of writing in coils
    Here, we make lift the bride
 """
 def injectValue(ip):
-	global iface
 	# Open connection
 	c = connectMb(ip)
 	
 	# Get the bridge to raise
 	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0000, outputValue=0xFF00)
-	c.sr1(myPayload, iface=iface)
+	c.sr1(myPayload)
 	
 	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0001, outputValue=0xFF00)
-	c.sr1(myPayload, iface=iface)
+	c.sr1(myPayload)
 
 	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0002, outputValue=0xFF00)
-	c.sr1(myPayload, iface=iface)
+	c.sr1(myPayload)
 
 	# close connection
 	c.close()
@@ -449,7 +448,7 @@ def SYN_flood(ip, timeout):
 Test malformated packet
 """
 def MBfuzzing(ip, test, quantity=50):
-	global verbose, iface
+	global verbose
 		
 	# Fuzzing test for reading
 	for i in range (1, quantity):
@@ -480,7 +479,7 @@ def MBfuzzing(ip, test, quantity=50):
 		
 		print str(i) + " - " + pkt.summary()	
 		
-		ans = c.sr1(pkt, verbose=verbose, iface=iface)
+		ans = c.sr1(pkt, verbose=verbose)
 		if ans is not None:
 			ans = ModbusADU_Response(str(ans))
 			print ans.summary()
@@ -491,14 +490,13 @@ def MBfuzzing(ip, test, quantity=50):
 Test of reassembling Device identification packets
 """
 def fragIdentif(ip):
-	global iface
 	# Open connection
 	c = connectMb(ip)
 	more = 255
 	objectId = 0
 	while more == 255:
 		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=3, objectId=objectId)
-		ans = c.sr1(pkt, verbose=verbose, iface=iface)
+		ans = c.sr1(pkt, verbose=verbose)
 		ans = ModbusADU_Response(str(ans))
 
 		if ans.funcCode == 0x2B:
@@ -515,7 +513,6 @@ def fragIdentif(ip):
 Retreive a specific value of a register
 """
 def getValue(c, code, addr):
-	global iface
 	
 	if code == 1:
 		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr)		
@@ -528,7 +525,7 @@ def getValue(c, code, addr):
 	else:
 		return None
 	
-	ans = c.sr1(pkt, verbose=verbose, iface=iface)
+	ans = c.sr1(pkt, verbose=verbose)
 	ans = ModbusADU_Response(str(ans))
 	
 	if ans.funcCode == 1:
