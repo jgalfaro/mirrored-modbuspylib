@@ -64,13 +64,13 @@ class MBregisters():
 	Read Device diagnostic
 	"""
 	def scanDeviceIdent(self):
-		global MINOBJECTID, MAXOBJECTID
+		global MINOBJECTID, MAXOBJECTID, verbose, iface
 		# Open connection
 		c = connectMb(self.ip)
 		
 		for objId in range(MINOBJECTID, MAXOBJECTID):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=4, objectId=objId)
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=False)
 			ans = ModbusADU_Response(str(ans))
 	
 			if ans.funcCode == 0x2B:
@@ -84,7 +84,7 @@ class MBregisters():
 	Test the device function codes defined
 	"""			
 	def checkCodeDefined(self, code):
-		global verbose
+		global verbose, iface
 ##		knownFunctions = [1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 20, 21, 22, 23, 24, 43]	
 		
 		#Check if code has been already set
@@ -131,10 +131,10 @@ class MBregisters():
 #FIXME:  Considering the packet forged, we try to put good values and length with the codes known and remove extra payload (seems not working)
 			pkt = ModbusADU_Request(str(pkt))
 		
-		try:			
+		try:	
 			if verbose:
 				print pkt.summary()
-			ans = c.sr1(pkt, timeout=1000, verbose=False)
+			ans = c.sr1(pkt, verbose=False)
 			ansADU = ModbusADU_Response(str(ans))
 			if verbose:
 				print ansADU.summary()
@@ -165,7 +165,7 @@ class MBregisters():
 
 
 	def checkCoilsDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(1)
 		if 1 not in self.code:
 			if verbose:
@@ -176,7 +176,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=False)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -192,7 +192,7 @@ class MBregisters():
 
 
 	def checkInDiscreteDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(2)
 		if 2 not in self.code:
 			if verbose:
@@ -203,7 +203,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=False)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -217,7 +217,7 @@ class MBregisters():
 		c.close()
 
 	def checkHoldRegDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(3)
 		if 3 not in self.code:
 			if verbose:
@@ -228,7 +228,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=False)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -242,7 +242,7 @@ class MBregisters():
 		c.close()
 
 	def checkRegInDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(4)
 		if 4 not in self.code:
 			if verbose:
@@ -253,7 +253,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=False)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -355,6 +355,7 @@ class SniffMB(threading.Thread):
 Open a new Streamsocket
 """
 def connectMb(ipDest):
+	global modport
 	s = socket.socket()
 	s.connect((ipDest, modport)) 
 	c = StreamSocket(s, Raw)
