@@ -662,7 +662,7 @@ def launchARPpoisonning(clientIP, gatewayIP):
 			print "Cannot get MAC addr"
 		return None
 	
-	t = ARPCachePoisonning(clientMAC, clientIP, gatewayIP)
+	t = ARPCachePoisonning(clientMAC, clientIP, gatewayMAC, gatewayIP)
 	t.poison()
 	sniff(prn=viewPkt, filter="icmp", timeout=60, iface=iface)
 
