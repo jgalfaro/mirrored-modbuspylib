@@ -43,7 +43,6 @@ Modbus/TCP Library for Scapy 0.2
 """
 
 import sys
-sys.path.append('/home/user/projects/tools/scapy')
 from scapy.all import *
 
 _modbus_exceptions = {  1: "Illegal function",
