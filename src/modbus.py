@@ -59,6 +59,25 @@ _read_device_id_codes = {  1: "Basic",
 						2: "Regular",
 						3: "Extended",
 						4: "Specific"}
+# Function codes range
+_fc_min = 1  # Default : 1 (0 is not valid)
+_fc_max = 45  # Default : 127 (Upper than 127 are exception codes)
+
+# Address range
+_bool_addr_min = 0
+_bool_addr_max = 25  # Default : 256
+
+_reg_addr_min = 0
+_reg_addr_max = 25  # Default : 256
+
+#Values per message
+_bool_per_msg = 2000
+_reg_per_msg = 125
+
+#Device Identification Object range (FC 43)
+_obj_id_min = 0
+_obj_id_max = 255
+
 
 
 # 0x00 - Undefined Generic Function
