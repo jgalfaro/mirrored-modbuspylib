@@ -109,51 +109,14 @@ class MBregisters():
 	"""			
 	def checkCodeDefined(self, code):
 		global verbose, iface
-##		knownFunctions = [1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 20, 21, 22, 23, 24, 43]	
 		
 		#Check if code has been already set
 		if self.code.count(code) > 0:
 			return
 		
-		# Open connection
 		c = connectMb(self.ip)
-		
-		if code == 1:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU01_Read_Coils_Request()		
-		elif code == 2:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU02_Read_Discrete_Inputs_Request()		
-		elif code == 3:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU03_Read_Holding_Registers_Request()		
-		elif code == 4:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU04_Read_Input_Registers_Request()		
-		elif code == 5:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU05_Write_Single_Coil_Request()		
-		elif code == 6:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU06_Write_Single_Register_Request()		
-		elif code == 7:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU07_Read_Exception_Status_Request()		
-		elif code == 15:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU0F_Write_Multiple_Coils_Request()		
-		elif code == 16:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU10_Write_Multiple_Registers_Request()		
-		elif code == 17:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU11_Report_Slave_Id_Request()		
-		elif code == 20:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU14_Read_File_Record_Request()		
-		elif code == 21:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU15_Write_File_Record_Request()		
-		elif code == 22:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU16_Mask_Write_Register_Request()		
-		elif code == 23:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU17_Read_Write_Multiple_Registers_Request()		
-		elif code == 24:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU18_Read_FIFO_Queue_Request()		
-		elif code == 43:
-			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request()		
-		else:
-			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU00_Generic_Request(funcCode=code)
-#FIXME:  Considering the packet forged, we try to put good values and length with the codes known and remove extra payload (seems not working)
-#			pkt = ModbusADU_Request(str(pkt))
+	
+		pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU00_Generic_Request(funcCode=code)
 		
 		try:	
 			if verbose:
@@ -169,10 +132,10 @@ class MBregisters():
 					print "Code " + str(pkt.funcCode) + " defined"
 				self.setCode(ansADU.funcCode)
 			else:
-				if pkt.funcCode == ansADU.funcCode + 0x80 and ansADU.exceptCode != 1:
+				if (pkt.funcCode + 0x80) == ansADU.funcCode and ansADU.exceptCode != 1:
+					self.setCode(pkt.funcCode)
 					if verbose:
 						print "Code " + str(pkt.funcCode) + " defined (but reply with error)"
-					self.setCode(ansADU.funcCode)
 				else:
 					if verbose:
 						print "Code " + str(pkt.funcCode) + " not defined (" + str(ansADU.funcCode) + ")" + " received, Exception : " + str(ansADU.exceptCode)
@@ -180,7 +143,6 @@ class MBregisters():
 			if verbose:
 				print "Something bad with " + str(pkt.funcCode)
 		c.close()
-
 	
 	def checkAllCodes(self, intrusive = False):
 		global MINCODE, MAXCODE
@@ -305,73 +267,6 @@ class MBregisters():
 				print "  ["+str(objId)+"] " + value
 				
 		
-class SniffMB(threading.Thread):
-	"""
-	This class sniff traffic and initiate the reply
-	"""
-	def __init__(self, ip, timer):
-		threading.Thread.__init__(self)
-		self._stopevent = threading.Event()
-		self.querys = {}
-		self.myReg = MBregisters(ip)
-		if timer is None:
-			timer = 20
-		self.timer = float(timer)
-
-	def run(self):
-		"""
-		Sniffing traffic
-		"""
-		global verbose
-
-		if verbose:
-			print("Sniffing...")
-		try:
-			sniff(prn=self.__reply, filter="port " + str(modport), timeout = self.timer)
-		except:
-			print("[LISTENING] Unexpected error:"), sys.exc_info()[0]
-
-		return
-
-	def __reply(self, pkt):
-		"""
-		Reply to received packet sniffed
-		@param pkt: packet
-		"""	
-		
-		if ModbusADU_Request in pkt:
-			index = str(pkt[IP].src) + " >> " + str(pkt[IP].dst) + " [" + str(pkt[ModbusADU_Request].transId) + "]" + str(pkt.funcCode)
-			self.querys[index] = pkt
-		elif ModbusADU_Response in pkt:
-			index = str(pkt[IP].dst) + " >> " + str(pkt[IP].src) + " [" + str(pkt[ModbusADU_Response].transId) + "]" + str(pkt.funcCode)
-			
-			#If we do not have the query, we reject the packet
-			if self.querys[index] is None:
-				return
-
-			query = self.querys[index]
-			del self.querys[index]
-
-			i = 0
-			if ModbusPDU01_Read_Coils_Response in pkt and ModbusPDU01_Read_Coils_Request in query:	
-				for addr in range (query[ModbusPDU01_Read_Coils_Request].startAddr, query[ModbusPDU01_Read_Coils_Request].startAddr + query[ModbusPDU01_Read_Coils_Request].quantity):
-					self.myReg.setCoil(addr, pkt[ModbusPDU01_Read_Coils_Response].coilStatus[i])
-					i+=1
-			elif ModbusPDU02_Read_Discrete_Inputs_Response in pkt and ModbusPDU02_Read_Discrete_Inputs_Request in query:
-				for addr in range (query[ModbusPDU02_Read_Discrete_Inputs_Request].startAddr, query[ModbusPDU02_Read_Discrete_Inputs_Request].startAddr + query[ModbusPDU02_Read_Discrete_Inputs_Request].quantity):
-					self.myReg.setInDiscrete(addr, pkt[ModbusPDU02_Read_Discrete_Inputs_Response].inputStatus[i])
-					i+=1
-			elif ModbusPDU03_Read_Holding_Registers_Response in pkt and ModbusPDU03_Read_Holding_Registers_Request in query:
-				for addr in range (query[ModbusPDU03_Read_Holding_Registers_Request].startAddr, query[ModbusPDU03_Read_Holding_Registers_Request].startAddr + query[ModbusPDU03_Read_Holding_Registers_Request].quantity):
-					self.myReg.setHoldReg(addr, pkt[ModbusPDU03_Read_Holding_Registers_Response].registerVal[i])
-					i+=1
-			elif ModbusPDU04_Read_Input_Registers_Response in pkt and ModbusPDU04_Read_Input_Registers_Request in query:
-				for addr in range (query[ModbusPDU04_Read_Input_Registers_Request].startAddr, query[ModbusPDU04_Read_Input_Registers_Request].startAddr + query[ModbusPDU04_Read_Input_Registers_Request].quantity):
-					self.myReg.setRegIn(addr, pkt[ModbusPDU04_Read_Input_Registers_Response].registerVal[i])
-					i+=1
-#TODO: interprete other codes
-			else:
-				return
 
 """
 Open a new Streamsocket
@@ -800,32 +695,64 @@ def compactList(oList, maxElements = 2000):
 Passive Device Monitoring
 Listen the traffic for the device values
 """
+
 def passiveMonitoring(ip, timer = 20):
-	sniffer = SniffMB(ip, timer)
-	sniffer.start()
-
+	global myReg, querys, myTimer
+	querys = {}
+	myReg = MBregisters(ip)
+	myTimer = time.time()
+	
 	try:
-		while sniffer.is_alive():
-			time.sleep(5)
-			sniffer.myReg.printMe()
-			print "---------------------------------"
-	except KeyboardInterrupt as e:
-		sniffer.join()
+		sniff(prn=packet2register, filter="port " + str(modport), timeout = timer)
+	except:
 		pass
-	sniffer.myReg.printMe()
+	
+def packet2register(pkt):
+	"""
+	Read Modbus packet to record status
+	@param pkt: packet
+	"""	
+	global querys, myReg, myTimer
+	knownFunctions = [1,2,3,4]
 
 	
-"""
-Launch an ARP poisonning attack
-"""
-def launchARPpoisonning(clientIP, gatewayIP, interval = 10):
-	global verbose, iface
-	
-	t = ARPCachePoisonning(clientIP, gatewayIP)
-	t.poison(interval)
-	time.sleep(300)
-	t.join()
-	
+	if ModbusADU_Request in pkt:
+		if pkt.funcCode in knownFunctions :
+			index = str(pkt[IP].src) + " >> " + str(pkt[IP].dst) + " [" + str(pkt[ModbusADU_Request].transId) + "]" + str(pkt.funcCode)
+			querys[index] = pkt
+	elif ModbusADU_Response in pkt:
+		index = str(pkt[IP].dst) + " >> " + str(pkt[IP].src) + " [" + str(pkt[ModbusADU_Response].transId) + "]" + str(pkt.funcCode)
+		
+		#If we do not have the query, we ignore the packet
+		if querys[index] is None:
+			return
+
+		query = querys[index]
+		del querys[index]
+
+		i = 0
+		if ModbusPDU01_Read_Coils_Response in pkt and ModbusPDU01_Read_Coils_Request in query:	
+			for addr in range (query[ModbusPDU01_Read_Coils_Request].startAddr, query[ModbusPDU01_Read_Coils_Request].startAddr + query[ModbusPDU01_Read_Coils_Request].quantity):
+				myReg.setCoil(addr, pkt[ModbusPDU01_Read_Coils_Response].coilStatus[i])
+				i+=1
+		elif ModbusPDU02_Read_Discrete_Inputs_Response in pkt and ModbusPDU02_Read_Discrete_Inputs_Request in query:
+			for addr in range (query[ModbusPDU02_Read_Discrete_Inputs_Request].startAddr, query[ModbusPDU02_Read_Discrete_Inputs_Request].startAddr + query[ModbusPDU02_Read_Discrete_Inputs_Request].quantity):
+				myReg.setInDiscrete(addr, pkt[ModbusPDU02_Read_Discrete_Inputs_Response].inputStatus[i])
+				i+=1
+		elif ModbusPDU03_Read_Holding_Registers_Response in pkt and ModbusPDU03_Read_Holding_Registers_Request in query:
+			for addr in range (query[ModbusPDU03_Read_Holding_Registers_Request].startAddr, query[ModbusPDU03_Read_Holding_Registers_Request].startAddr + query[ModbusPDU03_Read_Holding_Registers_Request].quantity):
+				myReg.setHoldReg(addr, pkt[ModbusPDU03_Read_Holding_Registers_Response].registerVal[i])
+				i+=1
+		elif ModbusPDU04_Read_Input_Registers_Response in pkt and ModbusPDU04_Read_Input_Registers_Request in query:
+			for addr in range (query[ModbusPDU04_Read_Input_Registers_Request].startAddr, query[ModbusPDU04_Read_Input_Registers_Request].startAddr + query[ModbusPDU04_Read_Input_Registers_Request].quantity):
+				myReg.setRegIn(addr, pkt[ModbusPDU04_Read_Input_Registers_Response].registerVal[i])
+				i+=1
+		else:
+			return
+	if time.time() - myTimer > 1 :
+		myTimer = time.time()
+		print "--------------" 
+		myReg.printMe()
 
 def viewPkt(pkt):
 	print pkt.summary()

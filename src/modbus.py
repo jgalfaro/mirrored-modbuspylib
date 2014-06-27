@@ -84,7 +84,7 @@ _obj_id_max = 255
 class ModbusPDU00_Generic_Request(Packet):
 	name = "Generic Request"
 	fields_desc = [ XByteField("funcCode", 0x00),
-							StrFixedLenField("payload", "", 255)]
+							StrFixedLenField("payload", "", 100)]
 	def extract_padding(self, s):
 		return "", None
 	def mysummary(self):
@@ -93,7 +93,7 @@ class ModbusPDU00_Generic_Request(Packet):
 class ModbusPDU00_Generic_Response(Packet):
 	name = "Generic Request"
 	fields_desc = [ XByteField("funcCode", 0x00),
-							StrFixedLenField("payload", "", 255)]
+							StrFixedLenField("payload", "", 100)]
 	def extract_padding(self, s):
 		return "", None
 	def mysummary(self):
