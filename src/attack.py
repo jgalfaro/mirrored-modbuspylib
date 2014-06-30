@@ -495,45 +495,145 @@ def SYN_flood(ip, timeout):
 """
 Test malformated packet
 """
-def MBfuzzing(ip, test, quantity=50):
-	global verbose
-		
+def MBfuzzing(ip, test, quantity=1):
+	global verbose, modpport
+	pcapFile = "output"+str(test)+".pcap"
+	pktSent = []
+	
 	# Fuzzing test for reading
-	for i in range (1, quantity):
-		# Open connection
-		c = connectMb(ip)
-		
-		# Revu all possible tests
-		
-		# Fuzz read_coils_request		
+	for i in range (0, quantity):
+				
 		pkt = None
-		if test == 1:
-			ADU = ModbusADU_Request(transId=getTransId())
-			pkt = ADU / fuzz(ModbusPDU01_Read_Coils_Request(funcCode=1))
-		# Fuzz write_single_coils_request		
-		elif test == 2:
-			ADU = ModbusADU_Request(transId=getTransId())
-			pkt = ADU / fuzz(ModbusPDU05_Write_Single_Coil_Request(funcCode=5))
-		# Test ADU transId = 0
-		elif test == 3:
-			pkt = ModbusADU_Request(transId=0, protoId=0, unitId=0) / ModbusPDU01_Read_Coils_Request()
-		# Fuzz on ADU proto Id, unitId
-		elif test == 4:
-			pkt = fuzz(ModbusADU_Request(transId=getTransId())) / ModbusPDU01_Read_Coils_Request()
-			
-		if pkt is None:
-			print "No test asked"
-			return
-		
-		print str(i) + " - " + pkt.summary()	
-		
-		ans = c.sr1(pkt, verbose=verbose)
-		if ans is not None:
-			ans = ModbusADU_Response(str(ans))
-			print ans.summary()
-		
-		c.close()
+		pktS = None
+		ADUGeneric = ModbusADU_Request(transId=getTransId())
+		PDUGeneric = ModbusPDU01_Read_Coils_Request()
+		PDUGenericStr = '\x01\x00\x00\x00\x01' #read Coil at addr 0, qtty 1
 
+#		print "Test " + str(test)
+		if test == 1:
+		# Fuzz read_coils_request		
+			pkt = ADUGeneric / fuzz(ModbusPDU01_Read_Coils_Request(funcCode=1))
+		elif test == 2:
+		# Fuzz write_single_coils_request		
+			pkt = ModbusADU_Request(transId=getTransId()) / fuzz(ModbusPDU05_Write_Single_Coil_Request(funcCode=5))
+		elif test == 3:
+			# Test ADU transId always at "0"
+			pkt = fuzz(ModbusADU_Request(transId=0, protoId=0, unitId=0)) / PDUGeneric
+		elif test == 4:
+			# Test ADU proto Id must be at "0"
+			pkt = fuzz(ModbusADU_Request(transId=0, unitId=0)) / PDUGeneric
+		elif test == 5:
+			# Test ADU unit Id (should be between 1 to 247, 0ModbusPDU01_Read_Coils_Request() = broadcast)
+			pkt = fuzz(ModbusADU_Request(transId=0, protoId=0)) / PDUGeneric
+		elif test == 6:
+			# Test PDU FC
+			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU00_Generic_Request(funcCode=RandNum(0, 255))
+		elif test == 7:
+			# ADU Corrects Multiple dans une requete
+			pktS = array.array('B')
+			pktS.fromstring('\x00\x01\x00\x00\x00\x06\xFF' + PDUGenericStr + '\x00\x01\x00\x00\x00\x06\x00' + PDUGenericStr)
+		elif test == 8:
+			# ADU with incorrect len at 0
+			pktS = array.array('B')
+			pktS.fromstring('\x00\x01\x00\x00\x00\x00\xFF' + PDUGenericStr)
+
+		elif test == 9:
+			# ADU with incorrect len at 1
+			pktS = array.array('B')
+			pktS.fromstring('\x00\x01\x00\x00\x00\x01\xFF' + PDUGenericStr)
+
+		elif test == 10:
+			# ADU with incorrect len (> real size)
+			pktS = array.array('B')
+			pktS.fromstring('\x00\x01\x00\x00\x00\x08\xFF' + PDUGenericStr)
+
+		elif test == 11:
+			# ADU with incorrect len (1 < xxx < real size)
+			pktS = array.array('B')
+			pktS.fromstring('\x00\x01\x00\x00\x00\x05\xFF' + PDUGenericStr)
+
+		elif test == 12:
+			# ADU with incorrect len too big
+			pktS = array.array('B')
+			pktS.fromstring('\x00\x01\x00\x00\xFF\xFF\xFF' + PDUGenericStr)
+			
+		elif test == 13:
+			# No PDU
+			pkt = ModbusADU_Request(transId=getTransId()) 
+		elif test == 14:
+			# Writing more than possible (N > max address)
+			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU0F_Write_Multiple_Coils_Request(startingAddr=0xFFFF, quantityOutput=6)			
+		
+		elif test == 15:
+			# Fuzz on outputValue (only 0x0000 and 0xFF00 expected)
+			pkt = ModbusADU_Request(transId=getTransId())/fuzz(ModbusPDU05_Write_Single_Coil_Request(funcCode=5, outputAddr=0))
+		elif test == 16:
+			# Quantity at 0
+			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU01_Read_Coils_Request(startAddr=0, quantity=0)
+		elif test == 17:
+			# Incoherent Quantity 
+			pktS = array.array('B')
+			#                                                 |FC |  start|qtty   |b c|values
+			pktS.fromstring('\x00\x01\x00\x00\x00\x09\xFF' + '\x0F\x00\x00\x00\x11\x01\xff\xff')
+		elif test == 18:
+			# Writing more than possible (N > max address)
+			pkt = ModbusADU_Request(transId=getTransId())/ModbusPDU0F_Write_Multiple_Coils_Request(startingAddr=0x0000, quantityOutput=200)			
+		
+		if pktS is not None:
+			#socket object instantiation
+			s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+			#connect requires ip addresses in string format so it must be cast
+			s.connect((str(ip), modport))
+
+			#send query to device
+			try:
+				#send data to device
+				s.send(pktS)
+					
+			except socket.error:
+				print "FAILED TO SEND"
+		
+			try:
+				#send data to device
+				data = s.recv(1024)
+				if data:
+					print data
+			except socket.error:
+				print "FAILED TO RECV"
+		
+			s.close()
+			
+		
+		if pkt is not None:	
+			pktSent.append(pkt)
+			ans = None
+			# Open connection
+			c = connectMb(ip)
+	
+			try:
+				
+				ans = c.sr1(pkt, verbose=verbose)
+			except:
+				pass
+			
+			if ans is not None:
+				ans = ModbusADU_Response(str(ans))
+				print ans.summary()
+			
+			c.close()
+		
+#	if len(pktSent) > 0:
+#		wrpcap(pcapFile, pktSent)
+
+
+def fuzzAll(ip, quantity=50):
+	"""
+	Perform all fuzzing tests
+	"""
+	for i in range (1, 4):
+		MBfuzzing(ip, i, quantity)
+	
 """
 Test of reassembling Device identification packets
 """
@@ -691,12 +791,11 @@ def compactList(oList, maxElements = 2000):
 				cList[start] = 1
 	return cList
 	
-"""
-Passive Device Monitoring
-Listen the traffic for the device values
-"""
-
 def passiveMonitoring(ip, timer = 20):
+	"""
+	Passive Device Monitoring
+	Listen the traffic for the device values
+	"""
 	global myReg, querys, myTimer
 	querys = {}
 	myReg = MBregisters(ip)
@@ -754,16 +853,13 @@ def packet2register(pkt):
 		print "--------------" 
 		myReg.printMe()
 
-def viewPkt(pkt):
-	print pkt.summary()
-
 """
-What to do if the script is call by  CLI and not imported
+if the script is call by CLI and not imported, read the params
 """
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-m", "--mode",
-                        choices=['scanNetwork', 'scanDeviceCode','scanDevice','scanDeviceIdent', 'injectValue', 'interact','SYN_flood', 'activeMonitor', 'passiveMonitor', 'MITM' ],
+                        choices=['scanNetwork', 'scanDeviceCode','scanDevice','scanDeviceIdent', 'injectValue', 'SYN_flood', 'activeMonitor', 'passiveMonitor', 'MITM','fuzz','fuzzAll' ],
                         help='mode of use :\n'
 							'scanNetwork = Scan ip range to find devices responding on Modbus port,'
 							'scanDeviceCode = Scan function codes defined,'
@@ -778,6 +874,7 @@ if __name__ == "__main__":
 	parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 	parser.add_argument("-c", "--intrusive", help="Make modification on PLC (use of Write functions)", action="store_true")
 	parser.add_argument("-i", "--interface", help="Network interface (eth0, etc.)", default="eth0")
+	parser.add_argument("-j", "--test", help="Test to perform", dest='test', type=int)
 	
 	args = parser.parse_args()
 
@@ -817,9 +914,9 @@ if __name__ == "__main__":
 	elif args.mode == "SYN_flood":
 		SYN_flood(args.target, args.timeout)
 	elif args.mode == "fuzz":
-		MBfuzzing(args.target, 3)
-	elif args.mode == "interact":
-		interact(mydict=globals())
+		MBfuzzing(args.target, args.test)
+	elif args.mode == "fuzzAll":
+		fuzzAll(args.target)
 	elif args.mode == "activeMonitor":
 		activeMonitoring(args.target)	
 	elif args.mode == "passiveMonitor":

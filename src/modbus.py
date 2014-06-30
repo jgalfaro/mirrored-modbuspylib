@@ -84,7 +84,9 @@ _obj_id_max = 255
 class ModbusPDU00_Generic_Request(Packet):
 	name = "Generic Request"
 	fields_desc = [ XByteField("funcCode", 0x00),
-							StrFixedLenField("payload", "", 100)]
+							StrFixedLenField("payload", "0123456789", 10)]
+#							FieldListField("payload", [0x00], ByteField("",0x00)) ]
+	
 	def extract_padding(self, s):
 		return "", None
 	def mysummary(self):
@@ -93,7 +95,8 @@ class ModbusPDU00_Generic_Request(Packet):
 class ModbusPDU00_Generic_Response(Packet):
 	name = "Generic Request"
 	fields_desc = [ XByteField("funcCode", 0x00),
-							StrFixedLenField("payload", "", 100)]
+							StrFixedLenField("payload", "0123456789", 10)]
+#							FieldListField("payload", [0x00], ByteField("",0x00)) ]
 	def extract_padding(self, s):
 		return "", None
 	def mysummary(self):
@@ -463,15 +466,13 @@ class ModbusPDU2B_Read_Device_Identification_Exception(Packet):
 	fields_desc = [ XByteField("funcCode", 0xAB),
 			ByteEnumField("exceptCode", 1, _modbus_exceptions)]
 
-
-
 class ModbusADU_Request(Packet):
 	name = "ModbusADU"
 	fields_desc = [ 
 			XShortField("transId", 0x0001), # needs to be unique
 			XShortField("protoId", 0x0000), # needs to be zero (Modbus)
 			ShortField("len", None), 		# is calculated with payload
-			XByteField("unitId", 0x00)] 	# 0xFF or 0x00 should be used for Modbus over TCP/IP
+			XByteField("unitId", 0xFF)] 	# 0xFF or 0x00 should be used for Modbus over TCP/IP
 	# Dissects packets
 	def guess_payload_class(self, payload):
 		funcCode = int(payload[0].encode("hex"),16)
