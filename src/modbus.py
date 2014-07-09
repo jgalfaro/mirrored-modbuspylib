@@ -472,7 +472,7 @@ class ModbusADU_Request(Packet):
 			XShortField("transId", 0x0001), # needs to be unique
 			XShortField("protoId", 0x0000), # needs to be zero (Modbus)
 			ShortField("len", None), 		# is calculated with payload
-			XByteField("unitId", 0xFF)] 	# 0xFF or 0x00 should be used for Modbus over TCP/IP
+			XByteField("unitId", 0xff)] 	# 0xFF or 0x00 should be used for Modbus over TCP/IP
 	# Dissects packets
 	def guess_payload_class(self, payload):
 		funcCode = int(payload[0].encode("hex"),16)
