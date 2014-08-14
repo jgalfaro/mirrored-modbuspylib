@@ -540,7 +540,9 @@ def MBfuzzing(ip, test, quantity=1, unitId=255):
     global verbose, modpport
     pcapFile = "output"+str(test)+".pcap"
     pktSent = []
-    unitidStr = str(hex(unitId))
+    unitidStr = '\xff'
+    nbOK = 0
+    nbKO = 0
     
     # Fuzzing test for reading
     for i in range (0, quantity):
@@ -619,7 +621,7 @@ def MBfuzzing(ip, test, quantity=1, unitId=255):
             pktS.fromstring('\x00\x01\x00\x00\x00\x09' + unitidStr + '\x0F\x00\x00\x00\x11\x01\xff\xff')
         elif test == 18:
             # Writing more than possible (N > max address)
-            pkt = ModbusADU_Request(transId=getTransId(), unitId=unitId)/ModbusPDU0F_Write_Multiple_Coils_Request(startingAddr=0x0000, quantityOutput=200)            
+            pkt = ModbusADU_Request(transId=getTransId(), unitId=unitId)/ModbusPDU0F_Write_Multiple_Coils_Request(startingAddr=0xffff, quantityOutput=200)            
         
         if pktS is not None:
             #socket object instantiation
@@ -662,7 +664,8 @@ def MBfuzzing(ip, test, quantity=1, unitId=255):
             if ans is not None:
                 ans = ModbusADU_Response(str(ans))
                 print ans.summary()
-            
+                
+              
             c.close()
         
     if len(pktSent) > 0:
@@ -675,6 +678,8 @@ def fuzzAll(ip, quantity=50, unitId=255):
     """
     for i in range (1, 4):
         MBfuzzing(ip, i, quantity, unitId)
+    
+    
     
 """
 Test of reassembling Device identification packets
