@@ -34,7 +34,9 @@ C) Analyse de vulnérabilités
    2.4 Monitoring des valeurs
       Actif : ./attack.py -m activeMonitor -t 10.0.1.1
       Passif : sudo ./attack.py -m passiveMonitor -t 10.0.1.1
-
-
+3. Fuzzing
+   3.1 Execution des tests successifs
+      ./attack.py -m fuzz -j [test] -q 1
+      Analyse des résultats avec Wireshark
 
 
