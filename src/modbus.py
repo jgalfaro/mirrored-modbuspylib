@@ -26,14 +26,14 @@ Modbus/TCP Library for Scapy 0.2
 	16 (0x10) Write Multiple Holding Registers
 
 	17 (0x11) Report Slave ID (Serial Line only)
+ 	22 (0x16) Mask Write Register
+ 	23 (0x17) Read/Write Multiple registers
 
 	43 (0x2B) Read Device Identification (MEI Type 14)
 
  Unimplemented function (TCP)
  	20 (0x14) Read File Record
  	21 (0x15) Write File Record
- 	22 (0x16) Mask Write Register
- 	23 (0x17) Read/Write Multiple registers
  	24 (0x18) Read FIFO Queue
 
 	Supported function codes:
@@ -472,7 +472,7 @@ class ModbusADU_Request(Packet):
 			XShortField("transId", 0x0001), # needs to be unique
 			XShortField("protoId", 0x0000), # needs to be zero (Modbus)
 			ShortField("len", None), 		# is calculated with payload
-			XByteField("unitId", 0xFF)] 	# 0xFF or 0x00 should be used for Modbus over TCP/IP
+			XByteField("unitId", 0xff)] 	# 0xFF or 0x00 should be used for Modbus over TCP/IP
 	# Dissects packets
 	def guess_payload_class(self, payload):
 		funcCode = int(payload[0].encode("hex"),16)
