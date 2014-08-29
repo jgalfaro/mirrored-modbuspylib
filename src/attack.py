@@ -88,11 +88,11 @@ class MBregisters():
 	Read Device diagnostic
 	"""
 	def scanDeviceIdent(self):
-		global _obj_id_min, _obj_id_max, verbose, iface
+		global verbose, iface
 		# Open connection
 		c = connectMb(self.ip)
 		
-		for objId in range(_obj_id_min, _obj_id_max):
+		for objId in range(0, 256):
 			pkt = ModbusADU_Request(transId=getTransId()) / ModbusPDU2B_Read_Device_Identification_Request(readCode=4, objectId=objId)
 			ans = c.sr1(pkt, verbose=False)
 			ans = ModbusADU_Response(str(ans))
@@ -836,7 +836,7 @@ def compactList(oList, maxElements = 2000):
 				cList[start] = 1
 	return cList
 	
-def passiveMonitoring(ip, timer = 20):
+def passiveMonitoring(ip, timer = 60):
 	"""
 	Passive Device Monitoring
 	Listen the traffic for the device values
