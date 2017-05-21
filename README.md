@@ -1,4 +1,3 @@
-
 These python library are used for working easily with Modbus (SCADA Network Protocol)
 It defines an extension of Scapy ( http://www.secdev.org/projects/scapy/doc/ )
 Project original : https://www.scadaforce.com/modbus
@@ -39,3 +38,4 @@ HOW TO...
 
 3. Attaques MITM
 
+More info available at: [LegoSCADA](http://www-public.tem-tsp.eu/~garcia_a/web/prototypes/legoscada/)
