@@ -11,8 +11,9 @@ Files :
 * attack.py : implementation of different tools and attacks for Modbus
 
 
-HOW TO...
+Quick how to:
 
+```
 -t target IP address (e.g., IP address of an RTU)
 -m atatck mode, such as:
 
@@ -35,3 +36,4 @@ HOW TO...
       Passive: # ./attack.py -m passiveMonitor -t 10.0.1.1
 
 3. MITM attacks
+```
