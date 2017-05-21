@@ -2,11 +2,11 @@ Traditional control systems are being upgraded with novel computing, communicati
 
 This library extends some [Scapy] (http://www.secdev.org/projects/scapy/doc/) functionality to work with the aforementioned testbed. Original project extends libraris at [https://www.scadaforce.com/modbus](https://www.scadaforce.com/modbus). More info available at: [LegoSCADA](http://www-public.tem-tsp.eu/~garcia_a/web/prototypes/legoscada/)
 
-Requirements :
+Requirements:
 * Scapy 2.2.0-dev (latest release)
 * python netaddr (Debian pkg : python-netaddr)
 
-Files :
+Files:
 * modbus.py : define the messages for scapy
 * attack.py : implementation of different tools and attacks for Modbus
 
